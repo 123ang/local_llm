@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Knowledge Assistant SaaS Dashboard</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --sidebar: #0f172a;
+      --card: #ffffff;
+      --line: #e5ebf5;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #dc2626;
+      --primary-soft: #fef2f2;
+      --green: #16a34a;
+      --green-soft: #ecfdf3;
+      --amber: #d97706;
+      --amber-soft: #fff7ed;
+      --red: #dc2626;
+      --red-soft: #fef2f2;
+      --violet: #7c3aed;
+      --violet-soft: #f5f3ff;
+      --shadow-sm: 0 6px 18px rgba(15, 23, 42, 0.05);
+      --shadow-lg: 0 18px 45px rgba(15, 23, 42, 0.08);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--text); background: var(--bg); }
+    .app { min-height: 100vh; display: grid; grid-template-columns: 270px 1fr; }
+    .sidebar { background: linear-gradient(180deg, #0f172a 0%, #101b32 100%); color: #fff; padding: 22px 18px; display: flex; flex-direction: column; gap: 18px; position: sticky; top: 0; min-height: 100vh; border-right: 1px solid rgba(255,255,255,0.05); }
+    .logo { display: flex; gap: 12px; align-items: center; padding: 10px 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .logo-mark { width: 42px; height: 42px; border-radius: 14px; background: linear-gradient(135deg, #dc2626 0%, #f97316 100%); display: grid; place-items: center; font-weight: 800; font-size: 18px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.3); }
+    .logo h1 { margin: 0; font-size: 16px; }
+    .logo p { margin: 3px 0 0; color: rgba(255,255,255,0.65); font-size: 12px; }
+    .workspace { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .workspace small { display: block; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+    .workspace strong { font-size: 14px; }
+    .nav-group-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,0.45); padding: 0 10px; margin-top: 6px; }
+    .nav { display: flex; flex-direction: column; gap: 6px; }
+    .nav button { border: 0; background: transparent; color: rgba(255,255,255,0.78); text-align: left; padding: 12px 14px; border-radius: 14px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: space-between; transition: .2s ease; }
+    .nav button:hover, .nav button.active { background: rgba(255,255,255,0.1); color: #fff; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #f97316; opacity: .9; }
+    .sidebar-bottom { margin-top: auto; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; padding: 14px; }
+    .sidebar-bottom strong { display: block; margin-bottom: 6px; }
+    .sidebar-bottom p { margin: 0; color: rgba(255,255,255,0.68); font-size: 12px; line-height: 1.55; }
+    .main { padding: 22px; display: flex; flex-direction: column; gap: 18px; }
+    .topbar { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; }
+    .search { display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 0 14px; height: 52px; box-shadow: var(--shadow-sm); }
+    .search input { flex: 1; border: 0; outline: none; font-size: 14px; background: transparent; color: var(--text); }
+    .top-actions { display: flex; gap: 10px; align-items: center; }
+    .ghost-btn, .primary-btn { height: 46px; padding: 0 16px; border-radius: 14px; font-weight: 700; border: 1px solid var(--line); background: var(--card); color: var(--text); cursor: pointer; box-shadow: var(--shadow-sm); }
+    .primary-btn { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .profile { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 8px 12px; box-shadow: var(--shadow-sm); }
+    .avatar { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #dc2626, #f97316); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+    .profile small { display: block; color: var(--muted); }
+    .profile strong { font-size: 13px; }
+    .panel { display: none; }
+    .panel.active { display: flex; flex-direction: column; gap: 18px; }
+    .header-block { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+    .header-block h2 { margin: 0 0 6px; font-size: 28px; }
+    .header-block p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; max-width: 760px; }
+    .page-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .grid-4, .grid-3, .grid-2, .grid-main, .chat-layout { display: grid; gap: 18px; }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-main { grid-template-columns: 1.3fr .8fr; }
+    .chat-layout { grid-template-columns: 300px 1fr; align-items: stretch; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 18px; }
+    .card.lg { padding: 22px; box-shadow: var(--shadow-lg); }
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+    .card-header h3, .card-header h4 { margin: 0 0 4px; }
+    .card-header p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .pill.blue { background: var(--primary-soft); color: var(--primary); }
+    .pill.green { background: var(--green-soft); color: var(--green); }
+    .pill.amber { background: var(--amber-soft); color: var(--amber); }
+    .pill.violet { background: var(--violet-soft); color: var(--violet); }
+    .pill.red { background: var(--red-soft); color: var(--red); }
+    .stat-value { font-size: 30px; font-weight: 800; margin: 4px 0 6px; letter-spacing: -.02em; }
+    .stat-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; margin-top: 14px; }
+    .spark { height: 48px; display: flex; align-items: end; gap: 6px; margin-top: 14px; }
+    .spark span { display: block; width: 10px; background: linear-gradient(180deg, #fdba74, #dc2626); border-radius: 10px 10px 4px 4px; opacity: .92; }
+    .hero-banner { background: linear-gradient(135deg, #7f1d1d 0%, #dc2626 45%, #f97316 100%); border-radius: 22px; color: #fff; padding: 22px; display: grid; grid-template-columns: 1.25fr .75fr; gap: 18px; box-shadow: var(--shadow-lg); }
+    .hero-banner h3 { margin: 0 0 8px; font-size: 26px; line-height: 1.15; }
+    .hero-banner p { margin: 0; line-height: 1.7; color: rgba(255,255,255,0.88); }
+    .hero-info { display: grid; gap: 12px; }
+    .mini-panel { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18); border-radius: 16px; padding: 14px; }
+    .mini-panel strong { display: block; margin-bottom: 6px; }
+    .mini-panel span { font-size: 13px; color: rgba(255,255,255,0.84); line-height: 1.55; }
+    .chart-area { height: 270px; border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%); position: relative; overflow: hidden; }
+    .chart-grid { position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(148,163,184,.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(148,163,184,.12) 1px, transparent 1px); background-size: 70px 54px; }
+    .chart-line { position: absolute; left: 24px; right: 24px; bottom: 44px; height: 140px; }
+    .chart-line svg { width: 100%; height: 100%; overflow: visible; }
+    .chart-foot { position: absolute; left: 22px; right: 22px; bottom: 14px; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .sources-list, .activity-list, .task-list, .history-list { display: flex; flex-direction: column; gap: 12px; }
+    .row-item { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 15px; border: 1px solid var(--line); border-radius: 16px; background: #fbfdff; }
+    .row-item strong { display: block; font-size: 14px; margin-bottom: 4px; }
+    .row-item span { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .progress { width: 120px; height: 8px; background: #edf2f7; border-radius: 999px; overflow: hidden; margin-top: 8px; }
+    .progress b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #fdba74, #dc2626); }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 14px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .tiny-badge { padding: 6px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; display: inline-block; }
+    .badge-green { background: var(--green-soft); color: var(--green); }
+    .badge-blue { background: var(--primary-soft); color: var(--primary); }
+    .badge-amber { background: var(--amber-soft); color: var(--amber); }
+    .badge-red { background: var(--red-soft); color: var(--red); }
+    .chat-shell { display: flex; flex-direction: column; min-height: 640px; }
+    .history-search { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 14px; background: #fff7ed; padding: 12px 14px; color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+    .history-item { padding: 12px 13px; border: 1px solid var(--line); border-radius: 14px; background: #fff7ed; cursor: pointer; transition: .2s ease; }
+    .history-item.active, .history-item:hover { background: #fff7ed; border-color: #fdba74; }
+    .history-item strong { display: block; font-size: 13px; margin-bottom: 5px; }
+    .history-item span { display: block; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .chat-header-minimal { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+    .chat-header-minimal h3 { margin: 0 0 4px; font-size: 18px; }
+    .chat-header-minimal p { margin: 0; color: var(--muted); font-size: 13px; }
+    .chat-thread { display: flex; flex-direction: column; gap: 14px; min-height: 420px; flex: 1; }
+    .bubble { max-width: 88%; padding: 14px 16px; border-radius: 18px; border: 1px solid var(--line); line-height: 1.65; font-size: 14px; background: #fff; }
+    .bubble.user { margin-left: auto; background: #fff7ed; border-color: #fdba74; }
+    .bubble.ai { background: #ffffff; }
+    .source-pills { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .source-pills span { padding: 7px 10px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 12px; font-weight: 700; }
+    .composer { display: flex; gap: 10px; align-items: center; border: 1px solid var(--line); background: #fbfdff; border-radius: 18px; padding: 10px 12px; margin-top: 16px; }
+    .composer input { flex: 1; border: 0; background: transparent; outline: none; font-size: 14px; }
+    .footer-note { color: var(--muted); font-size: 12px; line-height: 1.6; }
+    @media (max-width: 1260px) { .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid-main, .hero-banner { grid-template-columns: 1fr; } .chat-layout { grid-template-columns: 1fr; } }
+    @media (max-width: 980px) { .app { grid-template-columns: 1fr; } .sidebar { position: static; min-height: auto; } .topbar { grid-template-columns: 1fr; } .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .grid-4 { grid-template-columns: 1fr; } .main { padding: 14px; } .header-block h2 { font-size: 24px; } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-mark">AI</div>
+        <div>
+          <h1>KnowledgeOS</h1>
+          <p>Private company knowledge platform</p>
+        </div>
+      </div>
+      <div class="workspace">
+        <div>
+          <small>Current company</small>
+          <strong>Airport Ops Demo</strong>
+        </div>
+        <div class="pill blue">Live</div>
+      </div>
+      <div class="nav-group-title">Main</div>
+      <div class="nav">
+        <button class="active" data-panel="overview"><span>Overview</span><span class="dot"></span></button>
+        <button data-panel="chat"><span>Assistant</span><span class="dot"></span></button>
+        <button data-panel="knowledge"><span>Knowledge Base</span><span class="dot"></span></button>
+        <button data-panel="admin"><span>Admin Center</span><span class="dot"></span></button>
+      </div>
+      <div class="nav-group-title">Operations</div>
+      <div class="nav">
+        <button><span>Companies</span></button>
+        <button><span>Imports</span></button>
+        <button><span>Audit Logs</span></button>
+        <button><span>Settings</span></button>
+      </div>
+      <div class="sidebar-bottom">
+        <strong>Deployment</strong>
+        <p>Mac mini home server, Cloudflare Tunnel, local Ollama, PostgreSQL + pgvector, later portable to VPS.</p>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="topbar">
+        <div class="search">
+          <span>🔎</span>
+          <input value="Search SOPs, FAQ, users, datasets, companies..." />
+        </div>
+        <div class="top-actions">
+          <button class="ghost-btn">Export Report</button>
+          <button class="primary-btn">Upload Knowledge</button>
+        </div>
+        <div class="profile">
+          <div class="avatar">SA</div>
+          <div>
+            <small>Signed in as</small>
+            <strong>Super Admin</strong>
+          </div>
+        </div>
+      </div>
+
+      <section class="panel active" id="overview">
+        <div class="header-block">
+          <div>
+            <h2>Operations Overview</h2>
+            <p>This dashboard shows how the platform operates like a real SaaS product: company workspaces, indexed knowledge, user activity, question volume, and approved answer coverage across FAQ, RAG, and structured data.</p>
+          </div>
+          <div class="page-actions">
+            <div class="pill green">99.4% uptime</div>
+            <div class="pill violet">Local LLM only</div>
+            <div class="pill amber">12 items pending review</div>
+          </div>
+        </div>
+        <div class="hero-banner">
+          <div>
+            <h3>One assistant that answers from FAQ, SOP PDFs, and company records</h3>
+            <p>Users ask naturally. The system searches approved answers first, retrieves relevant documents, checks structured tables when needed, and returns one grounded response with sources.</p>
+          </div>
+          <div class="hero-info">
+            <div class="mini-panel">
+              <strong>Today’s top question</strong>
+              <span>“What should I do first during an apron incident, and which form should be submitted?”</span>
+            </div>
+            <div class="mini-panel">
+              <strong>Answer path</strong>
+              <span>FAQ match → emergency manual chunk → reporting form reference → final response.</span>
+            </div>
+          </div>
+        </div>
+        <div class="grid-4">
+          <div class="card lg"><div class="card-header"><div><h4>Active Companies</h4><p>Companies using the platform</p></div><div class="pill blue">+3 this month</div></div><div class="stat-value">18</div><div class="spark"><span style="height:22px"></span><span style="height:28px"></span><span style="height:20px"></span><span style="height:32px"></span><span style="height:39px"></span><span style="height:34px"></span><span style="height:44px"></span></div><div class="stat-foot"><span>Company isolation by company_id</span><strong>Stable</strong></div></div>
+          <div class="card lg"><div class="card-header"><div><h4>Questions Answered</h4><p>Last 30 days across all companies</p></div><div class="pill green">+18.7%</div></div><div class="stat-value">24,892</div><div class="spark"><span style="height:18px"></span><span style="height:26px"></span><span style="height:30px"></span><span style="height:34px"></span><span style="height:31px"></span><span style="height:43px"></span><span style="height:46px"></span></div><div class="stat-foot"><span>FAQ + RAG + structured data</span><strong>Healthy</strong></div></div>
+          <div class="card lg"><div class="card-header"><div><h4>Indexed Documents</h4><p>PDFs and manuals available in RAG</p></div><div class="pill violet">2,460 chunks/day</div></div><div class="stat-value">2,460</div><div class="spark"><span style="height:14px"></span><span style="height:24px"></span><span style="height:27px"></span><span style="height:30px"></span><span style="height:36px"></span><span style="height:33px"></span><span style="height:41px"></span></div><div class="stat-foot"><span>Approved and tagged by company</span><strong>Indexed</strong></div></div>
+          <div class="card lg"><div class="card-header"><div><h4>Structured Datasets</h4><p>Imported CSV tables</p></div><div class="pill amber">5 need mapping</div></div><div class="stat-value">57</div><div class="spark"><span style="height:16px"></span><span style="height:22px"></span><span style="height:19px"></span><span style="height:28px"></span><span style="height:35px"></span><span style="height:31px"></span><span style="height:38px"></span></div><div class="stat-foot"><span>Safe SQL only</span><strong>Controlled</strong></div></div>
+        </div>
+      </section>
+
+      <section class="panel" id="chat">
+        <div class="header-block">
+          <div>
+            <h2>Assistant</h2>
+            <p>A simpler ChatGPT-style layout with conversation history on the left and the active chat on the right.</p>
+          </div>
+          <div class="page-actions">
+            <div class="pill blue">Company: Airport Ops Demo</div>
+            <button class="primary-btn">New Chat</button>
+          </div>
+        </div>
+        <div class="chat-layout">
+          <div class="card lg">
+            <div class="card-header"><div><h3>Chat History</h3><p>Recent company conversations</p></div><div class="pill blue">24 chats</div></div>
+            <div class="history-search">🔎 Search conversations</div>
+            <div class="history-list">
+              <div class="history-item active"><strong>Apron incident procedure</strong><span>Form, SOP, and first-response steps</span></div>
+              <div class="history-item"><strong>Pending incident reports</strong><span>Monthly pending count and status lookup</span></div>
+              <div class="history-item"><strong>Runway closure reporting</strong><span>Which section and who should approve</span></div>
+              <div class="history-item"><strong>Refund escalation flow</strong><span>Customer support process and handover</span></div>
+              <div class="history-item"><strong>Emergency hotline contacts</strong><span>Quick access to approved contacts</span></div>
+            </div>
+          </div>
+          <div class="card lg chat-shell">
+            <div class="chat-header-minimal"><div><h3>Apron incident procedure</h3><p>Grounded answers from FAQ, documents, and company data</p></div><div class="pill green">Approved content mode</div></div>
+            <div class="chat-thread">
+              <div class="bubble user">What should I do first if an aircraft incident happens on the apron, and which form should be used?</div>
+              <div class="bubble ai">Based on the approved emergency procedure, the first action is to notify the emergency response unit and the duty supervisor immediately. The incident should then be documented using <strong>IR-02 Incident Report Form</strong>.<div class="source-pills"><span>FAQ: Incident reporting</span><span>PDF: Emergency Manual v3.2</span><span>PDF: Reporting Procedure p.14</span></div></div>
+              <div class="bubble user">How many incident reports are still pending this month?</div>
+              <div class="bubble ai">There are <strong>12 pending incident reports</strong> recorded for this month in the current company workspace.<div class="source-pills"><span>SQL: incident_reports</span><span>Dataset: March 2026 import</span></div></div>
+            </div>
+            <div class="composer"><input value="Message AI Knowledge Assistant..." /><button class="primary-btn" style="height:40px; padding:0 14px;">Send</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="knowledge">
+        <div class="header-block">
+          <div>
+            <h2>Knowledge Base</h2>
+            <p>All company knowledge is managed here: FAQ entries, policy and SOP documents, plus imported CSV datasets that can support safe question answering.</p>
+          </div>
+          <div class="page-actions">
+            <button class="ghost-btn">Add FAQ Item</button>
+            <button class="ghost-btn">Import CSV</button>
+            <button class="primary-btn">Upload PDF</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card lg"><div class="card-header"><div><h3>Knowledge Inventory</h3><p>Realistic admin list of company assets</p></div><div class="pill green">Synced</div></div>
+            <table><thead><tr><th>Name</th><th>Type</th><th>Company</th><th>Status</th><th>Last Updated</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Emergency Manual v3.2</strong><br><span style="color:var(--muted);font-size:13px;">Apron incident response</span></td><td>PDF</td><td>Airport Ops Demo</td><td><span class="tiny-badge badge-green">Approved</span></td><td>2026-03-06</td></tr>
+              <tr><td><strong>Incident Reporting FAQ</strong><br><span style="color:var(--muted);font-size:13px;">Form and escalation contact</span></td><td>FAQ</td><td>Airport Ops Demo</td><td><span class="tiny-badge badge-blue">Published</span></td><td>2026-03-05</td></tr>
+              <tr><td><strong>incident_reports_march.csv</strong><br><span style="color:var(--muted);font-size:13px;">Monthly incident dataset</span></td><td>CSV Dataset</td><td>Airport Ops Demo</td><td><span class="tiny-badge badge-amber">Mapped</span></td><td>2026-03-07</td></tr>
+            </tbody></table>
+          </div>
+          <div class="card lg"><div class="card-header"><div><h3>Add FAQ Item</h3><p>Super Admin creates FAQ under a selected company</p></div><div class="pill blue">Manual entry</div></div>
+            <div class="task-list">
+              <div class="row-item"><div><strong>Company</strong><span>Airport Ops Demo</span></div><span class="tiny-badge badge-blue">Required</span></div>
+              <div class="row-item"><div><strong>Category</strong><span>Emergency / Incident Reporting</span></div><span class="tiny-badge badge-blue">Required</span></div>
+              <div class="row-item"><div><strong>Question</strong><span>Which form should I use for an apron incident report?</span></div><span class="tiny-badge badge-blue">Required</span></div>
+              <div class="row-item"><div><strong>Answer</strong><span>Use IR-02 Incident Report Form and submit it to the duty supervisor immediately.</span></div><span class="tiny-badge badge-blue">Required</span></div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;"><button class="ghost-btn">Save Draft</button><button class="primary-btn">Publish FAQ</button></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="admin">
+        <div class="header-block">
+          <div>
+            <h2>Admin Center</h2>
+            <p>A realistic Super Admin workspace for managing companies, creating users under each company, reviewing imports, approving knowledge, and monitoring usage and safety controls.</p>
+          </div>
+          <div class="page-actions">
+            <button class="ghost-btn">View Audit Logs</button>
+            <button class="ghost-btn">Create User</button>
+            <button class="primary-btn">Create Company</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card lg">
+            <div class="card-header"><div><h3>Company Directory</h3><p>Managed companies on the platform</p></div><div class="pill blue">18 active</div></div>
+            <table><thead><tr><th>Company</th><th>Users</th><th>Docs</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Airport Ops Demo</strong></td><td>42</td><td>188</td><td><span class="tiny-badge badge-green">Live</span></td></tr>
+              <tr><td><strong>Retail Support Company</strong></td><td>27</td><td>94</td><td><span class="tiny-badge badge-green">Live</span></td></tr>
+              <tr><td><strong>SME Finance Pilot</strong></td><td>13</td><td>56</td><td><span class="tiny-badge badge-amber">Setup</span></td></tr>
+            </tbody></table>
+          </div>
+          <div class="card lg">
+            <div class="card-header"><div><h3>User Management</h3><p>Create users under a selected company</p></div><div class="pill green">248 users</div></div>
+            <div class="task-list">
+              <div class="row-item"><div><strong>Create user under Airport Ops Demo</strong><span>Assign role and company workspace</span></div><span class="tiny-badge badge-blue">Action</span></div>
+              <div class="row-item"><div><strong>Bulk import users</strong><span>CSV upload for onboarding by company</span></div><span class="tiny-badge badge-amber">Planned</span></div>
+              <div class="row-item"><div><strong>Review company access issue</strong><span>One user assigned to wrong company</span></div><span class="tiny-badge badge-red">Urgent</span></div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;"><button class="ghost-btn">View Users</button><button class="primary-btn">Create User</button></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const buttons = document.querySelectorAll('.nav button[data-panel]');
+    const panels = document.querySelectorAll('.panel');
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        panels.forEach(p => p.classList.remove('active'));
+        button.classList.add('active');
+        document.getElementById(button.dataset.panel).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
