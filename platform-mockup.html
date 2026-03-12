@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AI Knowledge Platform — Full Admin Mockup</title>
+<style>
+:root{--bg:#f4f7fb;--sidebar:#0f172a;--card:#fff;--line:#e5ebf5;--text:#0f172a;--muted:#64748b;--primary:#dc2626;--primary-soft:#fef2f2;--green:#16a34a;--green-soft:#ecfdf3;--amber:#d97706;--amber-soft:#fff7ed;--red:#dc2626;--red-soft:#fef2f2;--violet:#7c3aed;--violet-soft:#f5f3ff;--blue:#2563eb;--blue-soft:#eff6ff;--shadow-sm:0 6px 18px rgba(15,23,42,.05);--shadow-lg:0 18px 45px rgba(15,23,42,.08);--radius:16px}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
+
+/* ── Login ── */
+.login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b)}
+.login-box{width:400px;background:var(--card);border-radius:22px;padding:40px 36px;box-shadow:var(--shadow-lg)}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.login-logo .mark{width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#dc2626,#f97316);display:grid;place-items:center;font-weight:800;font-size:17px;color:#fff}
+.login-logo h1{font-size:20px}
+.login-logo p{color:var(--muted);font-size:13px;margin-top:2px}
+.field{margin-bottom:18px}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px}
+.field input{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:14px;outline:none;transition:.2s}
+.field input:focus{border-color:var(--primary)}
+.login-btn{width:100%;padding:14px;border:0;border-radius:14px;background:linear-gradient(135deg,#dc2626,#f97316);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:6px}
+.login-btn:hover{opacity:.92}
+.login-footer{text-align:center;margin-top:18px;color:var(--muted);font-size:13px}
+
+/* ── App Shell ── */
+.app{min-height:100vh;display:none;grid-template-columns:250px 1fr}
+.app.active{display:grid}
+.login-screen.hidden{display:none}
+
+/* ── Sidebar ── */
+.sidebar{background:linear-gradient(180deg,#0f172a,#101b32);color:#fff;padding:18px 14px;display:flex;flex-direction:column;gap:12px;position:sticky;top:0;height:100vh;overflow-y:auto;border-right:1px solid rgba(255,255,255,.05)}
+.logo{display:flex;gap:10px;align-items:center;padding:6px 6px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.logo-mark{width:38px;height:38px;border-radius:12px;background:linear-gradient(135deg,#dc2626,#f97316);display:grid;place-items:center;font-weight:800;font-size:15px;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.logo h1{font-size:14px;margin:0}
+.logo small{color:rgba(255,255,255,.5);font-size:10px}
+.nav-title{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.35);padding:0 8px;margin-top:8px}
+.nav{display:flex;flex-direction:column;gap:3px}
+.nav button{border:0;background:transparent;color:rgba(255,255,255,.68);text-align:left;padding:9px 11px;border-radius:11px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:9px;transition:.15s}
+.nav button:hover,.nav button.active{background:rgba(255,255,255,.1);color:#fff}
+.nav button .icon{width:18px;text-align:center;font-size:14px}
+.nav button .bc{margin-left:auto;background:rgba(249,115,22,.25);color:#fdba74;padding:2px 6px;border-radius:7px;font-size:10px;font-weight:700}
+.sidebar-footer{margin-top:auto;padding:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:12px;font-size:11px;color:rgba(255,255,255,.5);line-height:1.5}
+.sidebar-footer strong{color:rgba(255,255,255,.8);display:block;margin-bottom:3px}
+
+/* ── Main ── */
+.main{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;min-height:100vh}
+
+/* ── Topbar ── */
+.topbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.search-bar{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 12px;height:44px;box-shadow:var(--shadow-sm)}
+.search-bar input{flex:1;border:0;outline:none;font-size:13px;background:transparent}
+.company-switcher{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 4px 0 12px;height:44px;box-shadow:var(--shadow-sm)}
+.company-switcher label{font-size:11px;font-weight:700;color:var(--muted);white-space:nowrap}
+.company-switcher select{border:0;outline:none;font-size:13px;font-weight:600;background:transparent;color:var(--text);padding:8px 6px;cursor:pointer;min-width:160px}
+.btn{height:40px;padding:0 14px;border-radius:11px;font-weight:600;font-size:12px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer;box-shadow:var(--shadow-sm);white-space:nowrap}
+.btn:hover{background:#f8fafc}
+.btn-primary{background:linear-gradient(135deg,#dc2626,#ea580c);color:#fff;border-color:transparent}
+.btn-primary:hover{opacity:.9}
+.profile-chip{display:flex;gap:8px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:5px 10px 5px 5px;box-shadow:var(--shadow-sm)}
+.avatar{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#dc2626,#f97316);color:#fff;display:grid;place-items:center;font-weight:800;font-size:11px}
+.profile-chip small{display:block;color:var(--muted);font-size:10px}
+.profile-chip strong{font-size:11px}
+
+/* ── Panels ── */
+.panel{display:none;flex-direction:column;gap:14px}
+.panel.active{display:flex}
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap}
+.page-header h2{font-size:22px;margin-bottom:3px}
+.page-header p{color:var(--muted);font-size:12px;max-width:650px;line-height:1.55}
+.page-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);padding:14px}
+.card.lg{padding:18px;box-shadow:var(--shadow-lg)}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px}
+.card-head h3{font-size:15px;margin:0 0 2px}
+.card-head p{color:var(--muted);font-size:11px;margin:0}
+
+/* ── Grids ── */
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.g-chat{display:grid;grid-template-columns:260px 1fr;gap:12px;align-items:stretch}
+
+/* ── Pills / Badges ── */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:4px 9px;border-radius:999px;font-size:10px;font-weight:700;white-space:nowrap}
+.pill-red{background:var(--red-soft);color:var(--red)}.pill-green{background:var(--green-soft);color:var(--green)}.pill-amber{background:var(--amber-soft);color:var(--amber)}.pill-violet{background:var(--violet-soft);color:var(--violet)}.pill-blue{background:var(--blue-soft);color:var(--blue)}
+.badge{padding:4px 7px;border-radius:999px;font-size:10px;font-weight:700;display:inline-block}
+
+/* ── Stat Cards ── */
+.stat-val{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:4px 0}
+.stat-foot{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-top:8px}
+.spark{height:38px;display:flex;align-items:end;gap:4px;margin-top:8px}
+.spark span{display:block;width:8px;border-radius:6px 6px 2px 2px;opacity:.85}
+.sr span{background:linear-gradient(180deg,#fdba74,#dc2626)}.sg span{background:linear-gradient(180deg,#86efac,#16a34a)}.sv span{background:linear-gradient(180deg,#c4b5fd,#7c3aed)}.sa span{background:linear-gradient(180deg,#fde68a,#d97706)}
+
+/* ── Hero ── */
+.hero{background:linear-gradient(135deg,#7f1d1d 0%,#dc2626 45%,#f97316 100%);border-radius:18px;color:#fff;padding:20px;display:grid;grid-template-columns:1.3fr .7fr;gap:14px;box-shadow:var(--shadow-lg)}
+.hero h3{font-size:20px;line-height:1.2;margin-bottom:6px}
+.hero p{color:rgba(255,255,255,.85);line-height:1.6;font-size:13px}
+.mini-p{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:10px;font-size:12px}
+.mini-p strong{display:block;margin-bottom:3px}
+.mini-p span{color:rgba(255,255,255,.8);line-height:1.45}
+
+/* ── Tables ── */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+td strong{display:block;margin-bottom:1px}
+td .sub{color:var(--muted);font-size:11px}
+
+/* ── Row Items ── */
+.row-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fbfdff}
+.row-item+.row-item{margin-top:6px}
+.row-item strong{display:block;font-size:12px;margin-bottom:1px}
+.row-item span{font-size:11px;color:var(--muted)}
+
+/* ── Chat ── */
+.chat-shell{display:flex;flex-direction:column;min-height:540px}
+.history-list{display:flex;flex-direction:column;gap:6px}
+.h-item{padding:8px 10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:.15s;background:#fff7ed}
+.h-item:hover,.h-item.active{border-color:#fdba74}
+.h-item strong{display:block;font-size:11px;margin-bottom:2px}
+.h-item span{color:var(--muted);font-size:10px;line-height:1.4;display:block}
+.chat-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.chat-head h3{font-size:15px;margin:0 0 2px}
+.chat-head p{color:var(--muted);font-size:11px;margin:0}
+.thread{flex:1;display:flex;flex-direction:column;gap:10px;min-height:340px}
+.bubble{max-width:85%;padding:10px 12px;border-radius:14px;border:1px solid var(--line);line-height:1.55;font-size:12px;background:#fff}
+.bubble.user{margin-left:auto;background:#fff7ed;border-color:#fdba74}
+.source-pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.source-pills span{padding:4px 7px;border-radius:8px;background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;font-size:10px;font-weight:700}
+.composer{display:flex;gap:7px;align-items:center;border:1px solid var(--line);background:#fbfdff;border-radius:14px;padding:7px 9px;margin-top:12px}
+.composer input{flex:1;border:0;background:transparent;outline:none;font-size:12px}
+
+/* ── Forms ── */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid .full{grid-column:1/-1}
+.form-group label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;font-size:12px;outline:none;font-family:inherit;resize:vertical}
+.form-group textarea{min-height:70px}
+.form-actions{display:flex;gap:7px;margin-top:12px}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:2px solid var(--line);padding-bottom:0}
+.tab{padding:8px 14px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;border:0;background:transparent;border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ── Log ── */
+.log-entry{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.log-entry:last-child{border-bottom:0}
+.log-dot{width:9px;height:9px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.log-entry strong{font-size:12px;display:block;margin-bottom:1px}
+.log-entry .log-meta{font-size:11px;color:var(--muted)}
+
+/* ── Responsive ── */
+@media(max-width:1260px){.g4{grid-template-columns:repeat(2,1fr)}.hero{grid-template-columns:1fr}.g-chat{grid-template-columns:1fr}}
+@media(max-width:980px){.app.active{grid-template-columns:1fr}.sidebar{position:static;height:auto}.g3,.g2{grid-template-columns:1fr}}
+@media(max-width:640px){.g4{grid-template-columns:1fr}.main{padding:10px}.form-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo"><div class="mark">AI</div><div><h1>Knowledge Platform</h1><p>Multi-tenant AI assistant for your company</p></div></div>
+    <div class="field"><label>Email</label><input type="email" value="admin@company.com"/></div>
+    <div class="field"><label>Password</label><input type="password" value="password123"/></div>
+    <button class="login-btn" onclick="doLogin()">Sign In</button>
+    <div class="login-footer">Local deployment &middot; No data leaves your server</div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
+<div class="app" id="appShell">
+  <aside class="sidebar">
+    <div class="logo"><div class="logo-mark">AI</div><div><h1>Knowledge Platform</h1><small>Multi-tenant SaaS</small></div></div>
+
+    <div class="nav-title">Main</div>
+    <div class="nav">
+      <button class="active" data-p="overview"><span class="icon">📊</span>Overview</button>
+      <button data-p="chat"><span class="icon">💬</span>Assistant<span class="bc">3</span></button>
+    </div>
+
+    <div class="nav-title">Administration</div>
+    <div class="nav">
+      <button data-p="documents"><span class="icon">📄</span>Documents</button>
+      <button data-p="faq"><span class="icon">❓</span>FAQ</button>
+      <button data-p="database"><span class="icon">🗄️</span>Database</button>
+    </div>
+
+    <div class="nav-title">Platform</div>
+    <div class="nav">
+      <button data-p="companies"><span class="icon">🏢</span>Companies</button>
+      <button data-p="users"><span class="icon">👤</span>Users</button>
+      <button data-p="audit"><span class="icon">📋</span>Audit Logs<span class="bc">12</span></button>
+    </div>
+
+    <div class="sidebar-footer"><strong>Deployment</strong>Mac mini &middot; Cloudflare Tunnel &middot; Ollama &middot; PostgreSQL + pgvector</div>
+  </aside>
+
+  <main class="main">
+    <!-- ── Topbar with company switcher ── -->
+    <div class="topbar">
+      <div class="search-bar"><span>🔎</span><input placeholder="Search documents, FAQ, tables, users..."/></div>
+      <div class="company-switcher">
+        <label>Company:</label>
+        <select id="companySel">
+          <option>Airport Ops Demo</option>
+          <option>Retail Support Co</option>
+          <option>SME Finance Pilot</option>
+          <option>HR Services Ltd</option>
+        </select>
+      </div>
+      <div class="profile-chip"><div class="avatar">SA</div><div><small>Super Admin</small><strong>admin@company.com</strong></div></div>
+    </div>
+
+    <!-- ═══ OVERVIEW ═══ -->
+    <section class="panel active" id="overview">
+      <div class="page-header"><div><h2>Operations Overview</h2><p>Platform health across all companies: knowledge, questions, and answer quality.</p></div>
+        <div class="page-actions"><div class="pill pill-green">99.4% uptime</div><div class="pill pill-violet">Local LLM</div><div class="pill pill-amber">12 pending review</div></div></div>
+      <div class="hero">
+        <div><h3>One assistant — FAQ, documents, and database records</h3><p>Users ask naturally. The system searches approved FAQ first, retrieves relevant document chunks, checks structured tables when needed, and returns one grounded response with citations.</p></div>
+        <div style="display:grid;gap:8px">
+          <div class="mini-p"><strong>Top question today</strong><span>"What should I do during an apron incident and which form to submit?"</span></div>
+          <div class="mini-p"><strong>Answer path</strong><span>FAQ → emergency manual chunk → reporting form → combined answer with citations.</span></div>
+        </div>
+      </div>
+      <div class="g4">
+        <div class="card lg"><div class="card-head"><div><h3>Companies</h3><p>Active tenants</p></div><div class="pill pill-blue">+3</div></div><div class="stat-val">18</div><div class="spark sr"><span style="height:20px"></span><span style="height:26px"></span><span style="height:18px"></span><span style="height:30px"></span><span style="height:36px"></span><span style="height:32px"></span><span style="height:40px"></span></div><div class="stat-foot"><span>Row-level isolation</span><strong>Stable</strong></div></div>
+        <div class="card lg"><div class="card-head"><div><h3>Questions</h3><p>Last 30 days</p></div><div class="pill pill-green">+18.7%</div></div><div class="stat-val">24,892</div><div class="spark sg"><span style="height:16px"></span><span style="height:24px"></span><span style="height:28px"></span><span style="height:32px"></span><span style="height:29px"></span><span style="height:40px"></span><span style="height:44px"></span></div><div class="stat-foot"><span>FAQ + RAG + SQL</span><strong>Healthy</strong></div></div>
+        <div class="card lg"><div class="card-head"><div><h3>Documents</h3><p>PDFs indexed</p></div><div class="pill pill-violet">2,460 chunks</div></div><div class="stat-val">2,460</div><div class="spark sv"><span style="height:12px"></span><span style="height:22px"></span><span style="height:25px"></span><span style="height:28px"></span><span style="height:34px"></span><span style="height:30px"></span><span style="height:38px"></span></div><div class="stat-foot"><span>Approved &amp; tagged</span><strong>Indexed</strong></div></div>
+        <div class="card lg"><div class="card-head"><div><h3>Database Tables</h3><p>Across all companies</p></div><div class="pill pill-amber">3 pending</div></div><div class="stat-val">57</div><div class="spark sa"><span style="height:14px"></span><span style="height:20px"></span><span style="height:17px"></span><span style="height:26px"></span><span style="height:32px"></span><span style="height:28px"></span><span style="height:35px"></span></div><div class="stat-foot"><span>Safe read-only SQL</span><strong>Controlled</strong></div></div>
+      </div>
+      <div class="g2">
+        <div class="card lg"><div class="card-head"><div><h3>Recent Questions</h3><p>Latest across all companies</p></div></div>
+          <table><thead><tr><th>Question</th><th>Company</th><th>Source</th><th>Time</th></tr></thead><tbody>
+            <tr><td><strong>What form for apron incident?</strong></td><td>Airport Ops Demo</td><td><span class="badge pill-green">FAQ+RAG</span></td><td>2m ago</td></tr>
+            <tr><td><strong>Pending reports this month?</strong></td><td>Airport Ops Demo</td><td><span class="badge pill-amber">SQL</span></td><td>8m ago</td></tr>
+            <tr><td><strong>Refund process over RM500?</strong></td><td>Retail Support Co</td><td><span class="badge pill-violet">RAG</span></td><td>14m ago</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card lg"><div class="card-head"><div><h3>Knowledge Health</h3><p>By company</p></div></div>
+          <div class="row-item"><div><strong>Airport Ops Demo</strong><span>188 docs · 42 FAQ · 12 tables</span></div><div class="pill pill-green">Ready</div></div>
+          <div class="row-item"><div><strong>Retail Support Co</strong><span>94 docs · 18 FAQ · 6 tables</span></div><div class="pill pill-green">Ready</div></div>
+          <div class="row-item"><div><strong>SME Finance Pilot</strong><span>56 docs · 8 FAQ · 2 tables</span></div><div class="pill pill-amber">Setup</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ ASSISTANT ═══ -->
+    <section class="panel" id="chat">
+      <div class="page-header"><div><h2>Assistant</h2><p>Chat with the knowledge base. Questions search FAQ, documents, and database tables automatically.</p></div>
+        <div class="page-actions"><button class="btn btn-primary">New Chat</button></div></div>
+      <div class="g-chat">
+        <div class="card lg">
+          <div class="card-head"><div><h3>History</h3></div><div class="pill pill-blue">24</div></div>
+          <div class="history-list">
+            <div class="h-item active"><strong>Apron incident procedure</strong><span>Form, SOP, first-response</span></div>
+            <div class="h-item"><strong>Pending incident reports</strong><span>Monthly count lookup</span></div>
+            <div class="h-item"><strong>Runway closure reporting</strong><span>Section and approval</span></div>
+            <div class="h-item"><strong>Refund escalation flow</strong><span>Support process</span></div>
+            <div class="h-item"><strong>Emergency hotline contacts</strong><span>Approved contacts</span></div>
+          </div>
+        </div>
+        <div class="card lg chat-shell">
+          <div class="chat-head"><div><h3>Apron incident procedure</h3><p>Grounded answers from FAQ, documents, and company data</p></div><div class="pill pill-green">Approved content</div></div>
+          <div class="thread">
+            <div class="bubble user">What should I do first if an aircraft incident happens on the apron, and which form should be used?</div>
+            <div class="bubble">Based on the approved procedure, <strong>notify the emergency response unit and duty supervisor immediately</strong>. Document using <strong>IR-02 Incident Report Form</strong>.<div class="source-pills"><span>FAQ: Incident reporting</span><span>PDF: Emergency Manual v3.2</span><span>PDF: Reporting Procedure p.14</span></div></div>
+            <div class="bubble user">How many incident reports are still pending this month?</div>
+            <div class="bubble">There are <strong>12 pending incident reports</strong> this month.<div class="source-pills"><span>SQL: incident_reports</span><span>Table: March 2026 import</span></div></div>
+            <div class="bubble user">Which section covers fuel spill procedures?</div>
+            <div class="bubble"><strong>Section 5.3 — Fuel Spill Response</strong> of Emergency Manual v3.2. Steps: (1) Evacuate area, (2) Notify ARFF &amp; Hazmat, (3) Cordon off zone, (4) Complete Form HS-07.<div class="source-pills"><span>PDF: Emergency Manual v3.2, p.28-30</span><span>FAQ: Fuel spill escalation</span></div></div>
+          </div>
+          <div class="composer"><input placeholder="Ask anything about your company knowledge..."/><button class="btn btn-primary" style="height:36px">Send</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ DOCUMENTS (admin, scoped to selected company) ═══ -->
+    <section class="panel" id="documents">
+      <div class="page-header"><div><h2>Documents</h2><p>Upload and manage PDF documents for <strong id="docCompany">Airport Ops Demo</strong>. Indexed documents become searchable by the AI assistant.</p></div>
+        <div class="page-actions"><button class="btn">Reindex All</button><button class="btn btn-primary">Upload PDF</button></div></div>
+      <div class="card lg">
+        <div class="card-head"><div><h3>Document Library</h3></div><div class="pill pill-violet">188 documents</div></div>
+        <table><thead><tr><th>Document</th><th>Category</th><th>Pages</th><th>Chunks</th><th>Status</th><th>Updated</th></tr></thead><tbody>
+          <tr><td><strong>Emergency Manual v3.2</strong><div class="sub">Apron incident response</div></td><td>Emergency</td><td>68</td><td>342</td><td><span class="badge pill-green">Approved</span></td><td>2026-03-06</td></tr>
+          <tr><td><strong>Reporting Procedure Guide</strong><div class="sub">Forms, escalation</div></td><td>Operations</td><td>24</td><td>118</td><td><span class="badge pill-green">Approved</span></td><td>2026-03-04</td></tr>
+          <tr><td><strong>HR Leave Policy 2026</strong><div class="sub">Annual, sick, unpaid</div></td><td>HR</td><td>14</td><td>62</td><td><span class="badge pill-amber">Draft</span></td><td>2026-03-07</td></tr>
+          <tr><td><strong>IT Security Guidelines</strong><div class="sub">Password, VPN</div></td><td>IT</td><td>18</td><td>0</td><td><span class="badge pill-red">Pending index</span></td><td>2026-03-08</td></tr>
+        </tbody></table>
+      </div>
+      <div class="g2">
+        <div class="card lg">
+          <div class="card-head"><div><h3>Upload New Document</h3></div></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Category</label><select><option>Emergency</option><option>Operations</option><option>Safety</option><option>HR</option><option>IT</option></select></div>
+            <div class="form-group"><label>Department</label><input placeholder="e.g. Ground Operations"/></div>
+            <div class="form-group"><label>Version</label><input placeholder="e.g. v3.2"/></div>
+            <div class="form-group"><label>Status</label><select><option>Draft</option><option>Approved</option></select></div>
+            <div class="form-group full"><label>PDF File</label><input type="file" accept=".pdf" style="padding:7px"/></div>
+          </div>
+          <div class="form-actions"><button class="btn">Save Draft</button><button class="btn btn-primary">Upload &amp; Index</button></div>
+        </div>
+        <div class="card lg">
+          <div class="card-head"><div><h3>Processing Queue</h3></div></div>
+          <div class="row-item"><div><strong>IT Security Guidelines.pdf</strong><span>Parsing text... 45%</span></div><div class="pill pill-amber">Processing</div></div>
+          <div class="row-item"><div><strong>Cargo Handling SOP.pdf</strong><span>Generating embeddings... 78%</span></div><div class="pill pill-amber">Processing</div></div>
+          <div class="row-item"><div><strong>Vehicle Safety Rules.pdf</strong><span>Completed 2 min ago</span></div><div class="pill pill-green">Done</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ FAQ (admin, scoped to selected company) ═══ -->
+    <section class="panel" id="faq">
+      <div class="page-header"><div><h2>FAQ Management</h2><p>Curated answers for <strong id="faqCompany">Airport Ops Demo</strong>. Approved FAQ outranks all other sources in AI responses.</p></div>
+        <div class="page-actions"><button class="btn btn-primary">Add FAQ Item</button></div></div>
+      <div class="g2">
+        <div class="card lg">
+          <div class="card-head"><div><h3>FAQ Items</h3></div><div class="pill pill-green">38 approved</div></div>
+          <table><thead><tr><th>Question</th><th>Category</th><th>Priority</th><th>Status</th></tr></thead><tbody>
+            <tr><td><strong>Which form for apron incident?</strong><div class="sub">Use IR-02, submit to duty supervisor.</div></td><td>Emergency</td><td><span class="badge pill-red">Critical</span></td><td><span class="badge pill-green">Approved</span></td></tr>
+            <tr><td><strong>Runway closure escalation path?</strong><div class="sub">ATC → Duty Manager → Ops Director within 15 min.</div></td><td>Operations</td><td><span class="badge pill-amber">High</span></td><td><span class="badge pill-green">Approved</span></td></tr>
+            <tr><td><strong>How to request unpaid leave?</strong><div class="sub">Form HR-05, 14 days in advance.</div></td><td>HR</td><td><span class="badge pill-blue">Normal</span></td><td><span class="badge pill-green">Approved</span></td></tr>
+            <tr><td><strong>Emergency hotline numbers</strong><div class="sub">ARFF: 03-xxxx, Hazmat: 03-yyyy</div></td><td>Emergency</td><td><span class="badge pill-red">Critical</span></td><td><span class="badge pill-green">Approved</span></td></tr>
+          </tbody></table>
+        </div>
+        <div class="card lg">
+          <div class="card-head"><div><h3>Add / Edit FAQ</h3></div></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Category</label><select><option>Emergency</option><option>Operations</option><option>HR</option><option>Safety</option></select></div>
+            <div class="form-group"><label>Priority</label><select><option>Critical</option><option>High</option><option>Normal</option><option>Low</option></select></div>
+            <div class="form-group full"><label>Question</label><input placeholder="What should the user ask?"/></div>
+            <div class="form-group full"><label>Answer</label><textarea placeholder="The approved answer..."></textarea></div>
+            <div class="form-group full"><label>Tags</label><input placeholder="incident, form, safety"/></div>
+          </div>
+          <div class="form-actions"><button class="btn">Save Draft</button><button class="btn btn-primary">Publish FAQ</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ DATABASE (admin, scoped to selected company) ═══ -->
+    <section class="panel" id="database">
+      <div class="page-header"><div><h2>Database</h2><p>Manage structured data for <strong id="dbCompany">Airport Ops Demo</strong>. Create tables, upload CSV to auto-create tables, or insert data into existing tables.</p></div>
+        <div class="page-actions"><button class="btn" onclick="showDbTab('tables')">View Tables</button><button class="btn btn-primary" onclick="showDbTab('create')">Create Table</button></div></div>
+
+      <!-- Tabs -->
+      <div class="tabs" id="dbTabs">
+        <button class="tab active" onclick="showDbTab('tables')">Tables</button>
+        <button class="tab" onclick="showDbTab('create')">Create Table</button>
+        <button class="tab" onclick="showDbTab('upload-table')">Upload Table &amp; Data</button>
+        <button class="tab" onclick="showDbTab('upload-data')">Upload Data</button>
+      </div>
+
+      <!-- Tab: Tables -->
+      <div class="tab-content active" id="db-tables">
+        <div class="card lg">
+          <div class="card-head"><div><h3>Tables</h3><p>All tables for this company. AI can query these with safe read-only SQL.</p></div><div class="pill pill-blue">12 tables</div></div>
+          <table><thead><tr><th>Table Name</th><th>Description</th><th>Rows</th><th>Columns</th><th>Source</th><th>Status</th><th>Updated</th></tr></thead><tbody>
+            <tr><td><strong>incident_reports</strong></td><td>Monthly incident tracking</td><td>847</td><td>12</td><td><span class="badge pill-amber">CSV import</span></td><td><span class="badge pill-green">Active</span></td><td>2026-03-07</td></tr>
+            <tr><td><strong>staff_directory</strong></td><td>Employee names, roles, departments</td><td>342</td><td>8</td><td><span class="badge pill-amber">CSV import</span></td><td><span class="badge pill-green">Active</span></td><td>2026-03-01</td></tr>
+            <tr><td><strong>equipment_inventory</strong></td><td>Vehicles, tools, inspection dates</td><td>1,204</td><td>15</td><td><span class="badge pill-blue">Manual</span></td><td><span class="badge pill-green">Active</span></td><td>2026-02-25</td></tr>
+            <tr><td><strong>flight_schedule</strong></td><td>Arrivals, departures, gates</td><td>3,621</td><td>10</td><td><span class="badge pill-amber">CSV import</span></td><td><span class="badge pill-green">Active</span></td><td>2026-03-08</td></tr>
+            <tr><td><strong>maintenance_log</strong></td><td>Equipment servicing records</td><td>0</td><td>6</td><td><span class="badge pill-blue">Manual</span></td><td><span class="badge pill-violet">Empty</span></td><td>2026-03-09</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+
+      <!-- Tab: Create Table -->
+      <div class="tab-content" id="db-create">
+        <div class="g2">
+          <div class="card lg">
+            <div class="card-head"><div><h3>Create New Table</h3><p>Define a table manually with columns and types</p></div></div>
+            <div class="form-grid">
+              <div class="form-group"><label>Table Name</label><input placeholder="e.g. maintenance_log"/></div>
+              <div class="form-group"><label>Description</label><input placeholder="What data does this table hold?"/></div>
+            </div>
+            <div style="margin-top:14px">
+              <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px">Columns</label>
+              <table><thead><tr><th>Column Name</th><th>Type</th><th>Nullable</th><th></th></tr></thead><tbody>
+                <tr><td><input style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px" value="id"/></td><td><select style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px;width:100%"><option>SERIAL (auto)</option><option>INTEGER</option><option>VARCHAR</option></select></td><td>No (PK)</td><td></td></tr>
+                <tr><td><input style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px" value="equipment_id"/></td><td><select style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px;width:100%"><option>VARCHAR</option><option>INTEGER</option><option>TEXT</option></select></td><td><select style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option>No</option><option>Yes</option></select></td><td></td></tr>
+                <tr><td><input style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px" value="service_date"/></td><td><select style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px;width:100%"><option>DATE</option><option>TIMESTAMP</option><option>VARCHAR</option></select></td><td><select style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option>No</option><option>Yes</option></select></td><td></td></tr>
+                <tr><td><input style="width:100%;padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px" value="notes"/></td><td><select style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px;width:100%"><option>TEXT</option><option>VARCHAR</option></select></td><td><select style="padding:7px;border:1px solid var(--line);border-radius:7px;font-size:12px"><option>Yes</option><option>No</option></select></td><td></td></tr>
+              </tbody></table>
+              <button class="btn" style="margin-top:8px;height:34px;font-size:11px">+ Add Column</button>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary">Create Table</button></div>
+          </div>
+          <div class="card lg">
+            <div class="card-head"><div><h3>Supported Column Types</h3></div></div>
+            <table><thead><tr><th>Type</th><th>Description</th><th>Example</th></tr></thead><tbody>
+              <tr><td><strong>SERIAL</strong></td><td>Auto-increment integer (primary key)</td><td>1, 2, 3...</td></tr>
+              <tr><td><strong>INTEGER</strong></td><td>Whole number</td><td>42, 1000</td></tr>
+              <tr><td><strong>DECIMAL</strong></td><td>Number with decimals</td><td>99.50, 1234.00</td></tr>
+              <tr><td><strong>VARCHAR</strong></td><td>Short text (up to 500 chars)</td><td>MH1234, Active</td></tr>
+              <tr><td><strong>TEXT</strong></td><td>Long text (unlimited)</td><td>Notes, descriptions</td></tr>
+              <tr><td><strong>DATE</strong></td><td>Date only</td><td>2026-03-08</td></tr>
+              <tr><td><strong>TIMESTAMP</strong></td><td>Date + time</td><td>2026-03-08 14:30</td></tr>
+              <tr><td><strong>BOOLEAN</strong></td><td>True / false</td><td>true, false</td></tr>
+            </tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Upload Table & Data (CSV → auto-create table + insert) -->
+      <div class="tab-content" id="db-upload-table">
+        <div class="g2">
+          <div class="card lg">
+            <div class="card-head"><div><h3>Upload Table &amp; Data</h3><p>Upload a CSV file. A new table will be <strong>automatically created</strong> based on the CSV columns, then all rows will be inserted.</p></div></div>
+            <div class="form-grid">
+              <div class="form-group"><label>Table Name</label><input placeholder="e.g. flight_schedule"/></div>
+              <div class="form-group"><label>Description</label><input placeholder="What is this data?"/></div>
+              <div class="form-group full"><label>CSV File</label><input type="file" accept=".csv" style="padding:7px"/></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary">Upload &amp; Preview Schema</button></div>
+          </div>
+          <div class="card lg">
+            <div class="card-head"><div><h3>Schema Preview</h3><p>Inferred from CSV headers and sample data. Review and adjust before creating.</p></div><div class="pill pill-amber">Confirm to create</div></div>
+            <table><thead><tr><th>CSV Column</th><th>Detected Type</th><th>Nullable</th><th>Sample Value</th></tr></thead><tbody>
+              <tr><td>flight_no</td><td><select style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"><option>VARCHAR</option><option>TEXT</option></select></td><td>No</td><td>MH1234</td></tr>
+              <tr><td>airline</td><td><select style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"><option>VARCHAR</option><option>TEXT</option></select></td><td>No</td><td>Malaysia Airlines</td></tr>
+              <tr><td>scheduled_time</td><td><select style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"><option>TIMESTAMP</option><option>VARCHAR</option><option>DATE</option></select></td><td>No</td><td>2026-03-08 14:30</td></tr>
+              <tr><td>gate</td><td><select style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"><option>VARCHAR</option><option>TEXT</option></select></td><td>Yes</td><td>A12</td></tr>
+              <tr><td>status</td><td><select style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"><option>VARCHAR</option><option>TEXT</option></select></td><td>No</td><td>On Time</td></tr>
+              <tr><td>passengers</td><td><select style="padding:5px;border:1px solid var(--line);border-radius:6px;font-size:11px"><option>INTEGER</option><option>DECIMAL</option><option>VARCHAR</option></select></td><td>Yes</td><td>180</td></tr>
+            </tbody></table>
+            <div style="margin-top:10px;padding:10px;background:#fff7ed;border-radius:10px;font-size:11px;color:#92400e;border:1px solid #fed7aa">
+              <strong>What happens next:</strong> A new table <code>flight_schedule</code> will be created with these columns. All 3,621 rows from the CSV will be inserted. The table becomes immediately queryable by the AI assistant.
+            </div>
+            <div class="form-actions"><button class="btn">Edit Mapping</button><button class="btn btn-primary">Confirm &amp; Create Table</button></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Upload Data (insert into existing table) -->
+      <div class="tab-content" id="db-upload-data">
+        <div class="g2">
+          <div class="card lg">
+            <div class="card-head"><div><h3>Upload Data to Existing Table</h3><p>Insert CSV rows into a table that already exists. Columns must match.</p></div></div>
+            <div class="form-grid">
+              <div class="form-group"><label>Target Table</label>
+                <select>
+                  <option>incident_reports (12 columns)</option>
+                  <option>staff_directory (8 columns)</option>
+                  <option>equipment_inventory (15 columns)</option>
+                  <option>flight_schedule (10 columns)</option>
+                  <option>maintenance_log (6 columns)</option>
+                </select>
+              </div>
+              <div class="form-group"><label>Mode</label>
+                <select><option>Append (add new rows)</option><option>Replace (delete old rows, insert new)</option></select>
+              </div>
+              <div class="form-group full"><label>CSV File</label><input type="file" accept=".csv" style="padding:7px"/></div>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary">Upload &amp; Preview</button></div>
+          </div>
+          <div class="card lg">
+            <div class="card-head"><div><h3>Column Mapping Preview</h3><p>Matching CSV columns to table columns</p></div><div class="pill pill-green">All matched</div></div>
+            <table><thead><tr><th>CSV Column</th><th>→</th><th>Table Column</th><th>Type</th><th>Status</th></tr></thead><tbody>
+              <tr><td>report_id</td><td>→</td><td>report_id</td><td>INTEGER</td><td><span class="badge pill-green">Match</span></td></tr>
+              <tr><td>date</td><td>→</td><td>incident_date</td><td>DATE</td><td><span class="badge pill-amber">Renamed</span></td></tr>
+              <tr><td>description</td><td>→</td><td>description</td><td>TEXT</td><td><span class="badge pill-green">Match</span></td></tr>
+              <tr><td>status</td><td>→</td><td>status</td><td>VARCHAR</td><td><span class="badge pill-green">Match</span></td></tr>
+              <tr><td>assigned_to</td><td>→</td><td>assigned_to</td><td>VARCHAR</td><td><span class="badge pill-green">Match</span></td></tr>
+            </tbody></table>
+            <div style="margin-top:10px;padding:10px;background:var(--green-soft);border-radius:10px;font-size:11px;color:#166534;border:1px solid #bbf7d0">
+              <strong>Preview:</strong> 156 new rows will be appended to <code>incident_reports</code>. Existing 847 rows will not be affected.
+            </div>
+            <div class="form-actions"><button class="btn">Adjust Mapping</button><button class="btn btn-primary">Insert 156 Rows</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ COMPANIES ═══ -->
+    <section class="panel" id="companies">
+      <div class="page-header"><div><h2>Companies</h2><p>Create and manage tenant companies. Each company gets isolated data, knowledge, and users.</p></div>
+        <div class="page-actions"><button class="btn btn-primary">Create Company</button></div></div>
+      <div class="g2">
+        <div class="card lg">
+          <div class="card-head"><div><h3>Company Directory</h3></div><div class="pill pill-blue">18 companies</div></div>
+          <table><thead><tr><th>Company</th><th>Users</th><th>Docs</th><th>Tables</th><th>Status</th><th>Created</th></tr></thead><tbody>
+            <tr><td><strong>Airport Ops Demo</strong><div class="sub">airport-ops-demo</div></td><td>42</td><td>188</td><td>12</td><td><span class="badge pill-green">Active</span></td><td>2026-01-15</td></tr>
+            <tr><td><strong>Retail Support Co</strong><div class="sub">retail-support</div></td><td>27</td><td>94</td><td>6</td><td><span class="badge pill-green">Active</span></td><td>2026-02-01</td></tr>
+            <tr><td><strong>SME Finance Pilot</strong><div class="sub">sme-finance</div></td><td>13</td><td>56</td><td>2</td><td><span class="badge pill-amber">Setup</span></td><td>2026-02-20</td></tr>
+            <tr><td><strong>HR Services Ltd</strong><div class="sub">hr-services</div></td><td>8</td><td>12</td><td>0</td><td><span class="badge pill-amber">Setup</span></td><td>2026-03-01</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card lg">
+          <div class="card-head"><div><h3>Create Company</h3></div></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Company Name</label><input placeholder="e.g. Airport Ops Demo"/></div>
+            <div class="form-group"><label>Slug</label><input placeholder="e.g. airport-ops-demo"/></div>
+            <div class="form-group full"><label>Description</label><textarea placeholder="What does this company do?"></textarea></div>
+            <div class="form-group"><label>Status</label><select><option>Active</option><option>Setup</option></select></div>
+            <div class="form-group"><label>Storage Quota</label><select><option>5 GB</option><option>10 GB</option><option>25 GB</option><option>Unlimited</option></select></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary">Create Company</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ USERS ═══ -->
+    <section class="panel" id="users">
+      <div class="page-header"><div><h2>Users</h2><p>Manage users. Each user belongs to one company.</p></div>
+        <div class="page-actions"><button class="btn btn-primary">Create User</button></div></div>
+      <div class="g2">
+        <div class="card lg">
+          <div class="card-head"><div><h3>User Directory</h3><p id="userCompany">Airport Ops Demo</p></div><div class="pill pill-blue">42 users</div></div>
+          <table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead><tbody>
+            <tr><td><strong>Ahmad Razak</strong></td><td>ahmad@airportops.com</td><td><span class="badge pill-red">Super Admin</span></td><td><span class="badge pill-green">Active</span></td><td>2 min ago</td></tr>
+            <tr><td><strong>Siti Aminah</strong></td><td>siti@airportops.com</td><td><span class="badge pill-blue">User</span></td><td><span class="badge pill-green">Active</span></td><td>1 hr ago</td></tr>
+            <tr><td><strong>Raj Kumar</strong></td><td>raj@airportops.com</td><td><span class="badge pill-blue">User</span></td><td><span class="badge pill-green">Active</span></td><td>3 hr ago</td></tr>
+            <tr><td><strong>Lee Wei Ming</strong></td><td>weiming@airportops.com</td><td><span class="badge pill-blue">User</span></td><td><span class="badge pill-amber">Inactive</span></td><td>14 days ago</td></tr>
+          </tbody></table>
+        </div>
+        <div class="card lg">
+          <div class="card-head"><div><h3>Create User</h3></div></div>
+          <div class="form-grid">
+            <div class="form-group"><label>Full Name</label><input placeholder="e.g. Siti Aminah"/></div>
+            <div class="form-group"><label>Email</label><input type="email" placeholder="siti@company.com"/></div>
+            <div class="form-group"><label>Company</label><select><option>Airport Ops Demo</option><option>Retail Support Co</option><option>SME Finance Pilot</option></select></div>
+            <div class="form-group"><label>Role</label><select><option>Standard User</option><option>Super Admin</option></select></div>
+            <div class="form-group full"><label>Temporary Password</label><input type="password" placeholder="Set initial password"/></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-primary">Create User</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ AUDIT ═══ -->
+    <section class="panel" id="audit">
+      <div class="page-header"><div><h2>Audit Logs</h2><p>Platform activity: uploads, queries, SQL, feedback.</p></div>
+        <div class="page-actions"><button class="btn">Export CSV</button></div></div>
+      <div class="g3">
+        <div class="card lg">
+          <div class="card-head"><div><h3>Activity Feed</h3></div></div>
+          <div class="log-entry"><div class="log-dot" style="background:var(--green)"></div><div><strong>Document approved</strong><div class="log-meta">Emergency Manual v3.2 · Airport Ops Demo · 5 min ago</div></div></div>
+          <div class="log-entry"><div class="log-dot" style="background:var(--blue)"></div><div><strong>Table created from CSV</strong><div class="log-meta">flight_schedule (3,621 rows) · Airport Ops Demo · 12 min ago</div></div></div>
+          <div class="log-entry"><div class="log-dot" style="background:var(--amber)"></div><div><strong>Data uploaded</strong><div class="log-meta">156 rows → incident_reports · Airport Ops Demo · 18 min ago</div></div></div>
+          <div class="log-entry"><div class="log-dot" style="background:var(--violet)"></div><div><strong>FAQ published</strong><div class="log-meta">Incident reporting FAQ · Airport Ops Demo · 25 min ago</div></div></div>
+          <div class="log-entry"><div class="log-dot" style="background:var(--red)"></div><div><strong>SQL blocked</strong><div class="log-meta">DELETE attempt rejected · Retail Support Co · 2 hr ago</div></div></div>
+        </div>
+        <div class="card lg">
+          <div class="card-head"><div><h3>SQL Query Logs</h3></div></div>
+          <div class="row-item"><div><strong>SELECT COUNT(*) FROM incident_reports WHERE status='pending'</strong><span>12 rows · 45ms · 8 min ago</span></div><div class="pill pill-green">OK</div></div>
+          <div class="row-item"><div><strong>SELECT flight_no, gate FROM flight_schedule WHERE...</strong><span>28 rows · 62ms · 22 min ago</span></div><div class="pill pill-green">OK</div></div>
+          <div class="row-item"><div><strong>DELETE FROM users WHERE...</strong><span>Blocked by validator</span></div><div class="pill pill-red">Blocked</div></div>
+        </div>
+        <div class="card lg">
+          <div class="card-head"><div><h3>User Feedback</h3></div></div>
+          <div class="row-item"><div><strong>👍 Helpful</strong><span>"Apron incident procedure" — Siti · 10 min ago</span></div><div class="pill pill-green">Positive</div></div>
+          <div class="row-item"><div><strong>👎 Not helpful</strong><span>"Overtime approval" — Raj · 1 hr ago</span></div><div class="pill pill-red">Negative</div></div>
+          <div class="row-item"><div><strong>⚠ Needs review</strong><span>"Fuel spill" — low confidence · 2 hr ago</span></div><div class="pill pill-amber">Review</div></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+function doLogin(){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('appShell').classList.add('active')}
+
+function nav(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('[data-p]').forEach(b=>b.classList.toggle('active',b.dataset.p===id));
+}
+document.querySelectorAll('[data-p]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.p)));
+
+// Company switcher: update scoped labels
+document.getElementById('companySel').addEventListener('change',function(){
+  var c=this.value;
+  ['docCompany','faqCompany','dbCompany','userCompany'].forEach(id=>{
+    var el=document.getElementById(id);
+    if(el) el.textContent=c;
+  });
+});
+
+// Database tabs
+function showDbTab(tab){
+  document.querySelectorAll('#database .tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#dbTabs .tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('db-'+tab).classList.add('active');
+  var tabs={'tables':0,'create':1,'upload-table':2,'upload-data':3};
+  document.querySelectorAll('#dbTabs .tab')[tabs[tab]].classList.add('active');
+}
+</script>
+</body>
+</html>
