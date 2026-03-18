@@ -1,0 +1,65 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.core.database import engine, Base, async_session
+from app.core.logger import logger
+
+from app.api.auth import router as auth_router
+from app.api.companies import router as companies_router
+from app.api.users import router as users_router
+from app.api.faq import router as faq_router
+from app.api.documents import router as documents_router
+from app.api.datasets import router as datasets_router
+from app.api.chat import router as chat_router
+from app.api.audit import router as audit_router
+from app.api.status import router as status_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting AskAI backend...")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("Database tables ready")
+
+    # Ensure super admin exists
+    async with async_session() as db:
+        from app.services.user_service import ensure_super_admin
+        await ensure_super_admin(db, settings.SUPER_ADMIN_EMAIL, settings.SUPER_ADMIN_PASSWORD)
+        logger.info(f"Super admin ensured: {settings.SUPER_ADMIN_EMAIL}")
+
+    yield
+
+    await engine.dispose()
+    logger.info("AskAI backend shutdown")
+
+
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL, "http://localhost:3000", "http://localhost:3001"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth_router, prefix=settings.API_PREFIX)
+app.include_router(companies_router, prefix=settings.API_PREFIX)
+app.include_router(users_router, prefix=settings.API_PREFIX)
+app.include_router(faq_router, prefix=settings.API_PREFIX)
+app.include_router(documents_router, prefix=settings.API_PREFIX)
+app.include_router(datasets_router, prefix=settings.API_PREFIX)
+app.include_router(chat_router, prefix=settings.API_PREFIX)
+app.include_router(audit_router, prefix=settings.API_PREFIX)
+app.include_router(status_router, prefix=settings.API_PREFIX)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": settings.PROJECT_NAME}

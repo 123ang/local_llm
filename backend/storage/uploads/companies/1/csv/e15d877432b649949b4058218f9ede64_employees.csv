@@ -1,0 +1,21 @@
+employee_id,full_name,department,position,salary,hire_date,status,manager,office_location
+E001,Alice Johnson,Engineering,Senior Software Engineer,95000,2019-03-15,Active,Bob Chen,New York
+E002,Bob Chen,Engineering,Engineering Manager,120000,2017-06-01,Active,Sarah Lee,New York
+E003,Carol White,Marketing,Marketing Specialist,68000,2021-09-10,Active,David Kim,Los Angeles
+E004,David Kim,Marketing,Marketing Manager,98000,2018-11-22,Active,Sarah Lee,Los Angeles
+E005,Emily Davis,Sales,Sales Representative,72000,2022-01-18,Active,Frank Brown,Chicago
+E006,Frank Brown,Sales,Sales Manager,105000,2016-04-05,Active,Sarah Lee,Chicago
+E007,George Wilson,Engineering,Junior Developer,62000,2023-07-12,Active,Bob Chen,New York
+E008,Hannah Martinez,HR,HR Specialist,65000,2020-02-28,Active,Sarah Lee,New York
+E009,Ivan Thompson,Finance,Financial Analyst,80000,2019-08-14,Active,Sarah Lee,Chicago
+E010,Julia Anderson,Engineering,DevOps Engineer,90000,2020-05-20,Active,Bob Chen,New York
+E011,Kevin Taylor,Sales,Sales Representative,70000,2021-11-03,Active,Frank Brown,Los Angeles
+E012,Laura Jackson,Marketing,Content Writer,58000,2022-08-17,Active,David Kim,New York
+E013,Michael Harris,Engineering,Full Stack Developer,88000,2020-12-01,Active,Bob Chen,Chicago
+E014,Nancy Robinson,Finance,Finance Manager,115000,2015-09-30,Active,Sarah Lee,New York
+E015,Oliver Lewis,HR,HR Manager,92000,2017-03-15,Active,Sarah Lee,New York
+E016,Patricia Clark,Sales,Senior Sales Rep,85000,2018-07-22,Active,Frank Brown,Chicago
+E017,Richard Walker,Engineering,QA Engineer,75000,2021-04-09,Active,Bob Chen,Los Angeles
+E018,Sandra Hall,Marketing,Brand Manager,82000,2019-01-15,Active,David Kim,Chicago
+E019,Thomas Young,Finance,Accountant,70000,2022-03-28,Active,Nancy Robinson,New York
+E020,Sarah Lee,Executive,CEO,200000,2012-01-01,Active,,New York

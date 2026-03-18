@@ -1,0 +1,16 @@
+product_id,product_name,category,stock_quantity,reorder_level,unit_cost,selling_price,supplier,last_restocked
+P001,Laptop Pro X1,Electronics,342,50,650.00,1299.99,TechSupply Co,2024-05-15
+P002,Office Chair Ergonomic,Furniture,189,30,175.00,349.99,FurniturePlus,2024-05-20
+P003,Wireless Headphones,Electronics,567,100,85.00,199.99,AudioWorld,2024-06-01
+P004,Standing Desk,Furniture,124,25,280.00,599.99,FurniturePlus,2024-05-28
+P005,Webcam HD,Electronics,891,150,38.00,89.99,TechSupply Co,2024-06-05
+P006,Mechanical Keyboard,Electronics,445,80,65.00,149.99,TechSupply Co,2024-05-25
+P007,Monitor 27 inch,Electronics,234,40,210.00,449.99,DisplayTech,2024-06-03
+P008,USB-C Hub,Electronics,678,120,22.00,59.99,TechSupply Co,2024-06-02
+P009,Desk Lamp LED,Office Supplies,345,60,18.00,49.99,OfficeMart,2024-05-30
+P010,Notebook Set,Office Supplies,1200,200,3.50,12.99,PaperCo,2024-06-04
+P011,Coffee Machine,Appliances,89,15,120.00,259.99,HomeApply,2024-05-18
+P012,Air Purifier,Appliances,156,20,180.00,389.99,CleanAir Ltd,2024-05-22
+P013,Bookshelf 5-tier,Furniture,78,15,95.00,199.99,FurniturePlus,2024-05-10
+P014,Cable Management Kit,Electronics,567,100,8.00,24.99,TechSupply Co,2024-06-01
+P015,Whiteboard 48x36,Office Supplies,134,25,45.00,119.99,OfficeMart,2024-05-27

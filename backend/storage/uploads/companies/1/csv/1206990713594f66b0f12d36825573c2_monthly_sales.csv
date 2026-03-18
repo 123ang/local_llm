@@ -1,0 +1,31 @@
+month,year,product,category,region,units_sold,unit_price,revenue,cost,profit
+January,2024,Laptop Pro X1,Electronics,North,145,1299.99,188498.55,95000.00,93498.55
+January,2024,Office Chair Ergonomic,Furniture,North,230,349.99,80497.70,40000.00,40497.70
+January,2024,Wireless Headphones,Electronics,South,312,199.99,62396.88,25000.00,37396.88
+January,2024,Standing Desk,Furniture,East,98,599.99,58799.02,30000.00,28799.02
+January,2024,Laptop Pro X1,Electronics,South,112,1299.99,145598.88,73000.00,72598.88
+February,2024,Laptop Pro X1,Electronics,North,162,1299.99,210598.38,105000.00,105598.38
+February,2024,Office Chair Ergonomic,Furniture,North,198,349.99,69297.02,35000.00,34297.02
+February,2024,Wireless Headphones,Electronics,South,289,199.99,57796.11,23000.00,34796.11
+February,2024,Standing Desk,Furniture,East,114,599.99,68398.86,35000.00,33398.86
+February,2024,Webcam HD,Electronics,West,405,89.99,36445.95,15000.00,21445.95
+March,2024,Laptop Pro X1,Electronics,North,201,1299.99,261297.99,130000.00,131297.99
+March,2024,Office Chair Ergonomic,Furniture,South,345,349.99,120746.55,60000.00,60746.55
+March,2024,Wireless Headphones,Electronics,East,467,199.99,93495.33,37000.00,56495.33
+March,2024,Standing Desk,Furniture,West,156,599.99,93598.44,47000.00,46598.44
+March,2024,Webcam HD,Electronics,North,678,89.99,60992.22,27000.00,33992.22
+April,2024,Laptop Pro X1,Electronics,South,189,1299.99,245597.11,122000.00,123597.11
+April,2024,Office Chair Ergonomic,Furniture,East,267,349.99,93497.33,47000.00,46497.33
+April,2024,Wireless Headphones,Electronics,West,523,199.99,104694.77,42000.00,62694.77
+April,2024,Standing Desk,Furniture,North,134,599.99,80398.66,40000.00,40398.66
+April,2024,Webcam HD,Electronics,South,890,89.99,80091.10,36000.00,44091.10
+May,2024,Laptop Pro X1,Electronics,East,224,1299.99,291197.76,145000.00,146197.76
+May,2024,Office Chair Ergonomic,Furniture,West,412,349.99,144195.88,72000.00,72195.88
+May,2024,Wireless Headphones,Electronics,North,601,199.99,120193.99,48000.00,72193.99
+May,2024,Standing Desk,Furniture,South,178,599.99,106798.22,53000.00,53798.22
+May,2024,Webcam HD,Electronics,East,734,89.99,66032.66,29000.00,37032.66
+June,2024,Laptop Pro X1,Electronics,West,267,1299.99,347097.33,172000.00,175097.33
+June,2024,Office Chair Ergonomic,Furniture,North,389,349.99,136196.11,68000.00,68196.11
+June,2024,Wireless Headphones,Electronics,South,712,199.99,142392.88,57000.00,85392.88
+June,2024,Standing Desk,Furniture,East,201,599.99,120597.99,60000.00,60597.99
+June,2024,Webcam HD,Electronics,West,956,89.99,85990.44,38000.00,47990.44
