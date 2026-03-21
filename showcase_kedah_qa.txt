@@ -1,0 +1,49 @@
+ANDAI Showcase Q&A (Kedah Investment, Database-only)
+
+Q1: From the approved investment table, what is the total approved investment RM?
+A1: - **Total Approved Investment RM**: 62,599,928,663.3959
+   (database rows returned: 1)
+
+Q2: Which state has the highest total approved investment RM?
+A2: The database results show that all entries for "total_rm_million" are marked as "None," indicating no valid numerical data is available to determine the state with the highest total approved investment RM.
+   (database rows returned: 50)
+
+Q3: Show top 5 industries by total approved investment RM.
+A3: - **Manufacturing** | 4,065,271,041.63 RM  
+- **Plastic Products** | 2,562,888,007.095844 RM  
+- **Electrical & Electronics** | 725,028,545.140118 RM  
+- **Transport Equipment** | 604,691,083.87554 RM  
+- **Services** | 299,393,519.82 RM
+   (database rows returned: 20)
+
+Q4: What is the total employment from all investment records?
+A4: The total employment from all investment records is **268,621**.
+   (database rows returned: 1)
+
+Q5: Give a breakdown of total approved investment RM by year.
+A5: - **2019**: RM22,953.75  
+- **2020**: RM99,386.13  
+- **2021**: RM327,526.52  
+- **2023**: No data available  
+- **2025**: RM62,599,478,796.99  
+
+Note: Values are in Malaysian Ringgit (RM). Data for 2023 is missing.
+   (database rows returned: 5)
+
+Q6: How many records do we have for Kedah investment data?
+A6: - **Database Result:** 0 records found for Kedah investment data.
+   (database rows returned: 1)
+
+Q7: List top 5 countries by foreign investment amount.
+A7: - **USA**: 9,726,328,205.02  
+- **Japan**: 7,381,662,060.48  
+- **The People’s Republic of China**: 4,747,461,112.0  
+- **Germany**: 1,278,044,633.0  
+- **Singapore**: 440,549,723.14
+   (database rows returned: 20)
+
+Q8: What are the distinct sectors in this dataset?
+A8: - services  
+- unknown  
+- manufacturing
+   (database rows returned: 3)

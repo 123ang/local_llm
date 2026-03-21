@@ -3,9 +3,10 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, MessageSquare, FileText, HelpCircle,
-  Database, Building2, Users, ScrollText, LogOut, Bot,
+  Database, Building2, Users, ScrollText, LogOut,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const mainNav = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -48,10 +49,7 @@ export default function Sidebar() {
   return (
     <aside className="w-64 min-h-screen flex flex-col" style={{ background: "#1a1a2e" }}>
       <div className="p-5 border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <Bot size={28} className="text-red-500" />
-          <span className="text-xl font-bold text-white tracking-tight">AskAI</span>
-        </div>
+        <BrandLogo variant="sidebar" />
       </div>
 
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto">

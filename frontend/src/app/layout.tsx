@@ -3,14 +3,14 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
-  title: "AskAI",
-  description: "AI Knowledge Platform",
+  title: "Adaptive Neural Decision AI",
+  description: "AI Knowledge Platform — Adaptive Neural Decision AI",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <body className="antialiased" suppressHydrationWarning>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

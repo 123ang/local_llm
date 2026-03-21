@@ -124,15 +124,29 @@ export const api = {
     ),
 
   // Chat
-  getChatSessions: () => request<any[]>("/chat/sessions"),
+  getChatSessions: (companyId?: number) => request<any[]>(companyId ? `/chat/sessions?company_id=${companyId}` : "/chat/sessions"),
   getChatMessages: (sessionId: number) => request<any[]>(`/chat/sessions/${sessionId}/messages`),
-  sendMessage: async (message: string, sessionId?: number, companyId?: number, sources?: string[]) => {
+  sendMessage: async (
+    message: string,
+    sessionId?: number,
+    companyId?: number,
+    sources?: string[],
+    aiInsights = true,
+    modelMode: "auto" | "instant" | "thinking" = "auto"
+  ) => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min for slow LLM
+    const timeout = setTimeout(() => controller.abort(), 120_000);
     try {
       return await request<any>("/chat", {
         method: "POST",
-        body: JSON.stringify({ message, session_id: sessionId, company_id: companyId, sources: sources ?? undefined }),
+        body: JSON.stringify({
+          message,
+          session_id: sessionId,
+          company_id: companyId,
+          sources: sources ?? undefined,
+          ai_insights: aiInsights,
+          model_mode: modelMode,
+        }),
         signal: controller.signal,
       });
     } finally {

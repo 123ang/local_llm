@@ -1,0 +1,35 @@
+ANDAI Showcase Q&A (Kedah Investment - Best Questions, Database-only)
+
+Q1: From the approved investment table, what is the total approved investment RM?
+A1: - The total approved investment RM is **62,599,928,663.3959**.
+   (database rows returned: 1)
+
+Q2: Show top 5 industries by total approved investment RM.
+A2: - **Manufacturing**: 4,065,271,041.63 RM  
+- **Plastic Products**: 2,562,888,007.09 RM  
+- **Electrical & Electronics**: 725,028,545.14 RM  
+- **Transport Equipment**: 604,691,083.88 RM  
+- **Services**: 299,393,519.82 RM
+   (database rows returned: 20)
+
+Q3: What is the total employment from all investment records?
+A3: The total employment from all investment records is **268,621**.
+   (database rows returned: 1)
+
+Q4: List top 5 countries by foreign investment amount.
+A4: - **USA**: $9,726,328,205.02  
+- **Japan**: $7,381,662,060.48  
+- **The People’s Republic of China**: $4,747,461,112.0  
+- **Germany**: $1,278,044,633.0  
+- **Singapore**: $440,549,723.14
+   (database rows returned: 20)
+
+Q5: What are the distinct sectors in this dataset?
+A5: - services  
+- unknown  
+- manufacturing
+   (database rows returned: 3)
+
+Q6: Which year has the highest total approved investment RM?
+A6: The database results only list years but do not include actual investment amounts. Without the total investment values per year, it is not possible to determine which year has the highest total approved investment RM. Please provide the investment amounts for accurate analysis.
+   (database rows returned: 50)

@@ -20,10 +20,10 @@ async def verify():
     
     async with async_session() as db:
         # Check UUM company
-        result = await db.execute(select(Company).where(Company.name == "UUM utlc"))
+        result = await db.execute(select(Company).where(Company.name == "UUM"))
         uum_company = result.scalar_one_or_none()
         if uum_company:
-            print(f"\n[UUM utlc] Company ID: {uum_company.id}")
+            print(f"\n[UUM] Company ID: {uum_company.id}")
             result = await db.execute(
                 select(Dataset).where(Dataset.company_id == uum_company.id)
             )
@@ -34,7 +34,7 @@ async def verify():
                     count = count_result.scalar()
                     print(f"  - {ds.display_name} ({ds.table_name}): {count} rows")
         else:
-            print("\n[ERROR] UUM utlc company not found!")
+            print("\n[ERROR] UUM company not found!")
         
         # Check Kedah Investment company
         result = await db.execute(select(Company).where(Company.name == "Kedah Investment"))

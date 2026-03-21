@@ -20,6 +20,8 @@ from app.ingestion.sql_importer import (
 import re
 from datetime import datetime, date
 
+UUM_COMPANY_NAME = "UUM"
+
 
 def _safe_table_name(company_id: int, name: str) -> str:
     clean = re.sub(r'[^a-z0-9_]', '_', name.lower().strip())
@@ -41,14 +43,27 @@ async def fix_uum_import():
     print("=" * 60)
     
     async with async_session() as db:
-        # Get UUM company
-        result = await db.execute(select(Company).where(Company.name == "UUM utlc"))
+        from app.services.company_service import create_company
+
+        result = await db.execute(select(Company).where(Company.name == UUM_COMPANY_NAME))
         company = result.scalar_one_or_none()
         if not company:
-            print("[ERROR] UUM utlc company not found!")
-            return
-        
-        print(f"Found company: {company.name} (ID: {company.id})")
+            result = await db.execute(select(Company).where(Company.name == "UUM utlc"))
+            company = result.scalar_one_or_none()
+            if company:
+                company.name = UUM_COMPANY_NAME
+                if not company.description:
+                    company.description = "UUM database"
+                await db.commit()
+                await db.refresh(company)
+                print(f"[OK] Renamed legacy company to: {company.name} (ID: {company.id})")
+        if not company:
+            company = await create_company(
+                db, name=UUM_COMPANY_NAME, description="UUM database"
+            )
+            print(f"[OK] Created company: {company.name} (ID: {company.id})")
+        else:
+            print(f"Found company: {company.name} (ID: {company.id})")
         
         # Delete existing datasets for this company
         result = await db.execute(

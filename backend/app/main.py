@@ -18,7 +18,7 @@ from app.api.status import router as status_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting AskAI backend...")
+    logger.info(f"Starting {settings.PROJECT_NAME} backend...")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables ready")
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield
 
     await engine.dispose()
-    logger.info("AskAI backend shutdown")
+    logger.info(f"{settings.PROJECT_NAME} backend shutdown")
 
 
 app = FastAPI(
@@ -41,9 +41,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = [
+    settings.FRONTEND_URL,
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
+if settings.CORS_EXTRA_ORIGINS:
+    _cors_origins.extend(
+        o.strip() for o in settings.CORS_EXTRA_ORIGINS.split(",") if o.strip()
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:3000", "http://localhost:3001"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

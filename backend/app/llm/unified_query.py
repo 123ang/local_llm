@@ -24,6 +24,8 @@ async def unified_query(
     company_id: int | None,
     db: AsyncSession,
     enabled_sources: list[str] | None = None,
+    ai_insights: bool = True,
+    model_mode: str = "auto",
 ) -> dict:
     """
     Search selected knowledge sources (FAQ, documents, structured data)
@@ -31,9 +33,10 @@ async def unified_query(
 
     ``enabled_sources`` is a list such as ["faq", "documents", "database"].
     When *None* (default) all three are searched.
+    When ``ai_insights`` is False, return raw retrieved data without LLM generation.
     """
     all_sources = {"faq", "documents", "database"}
-    active = set(enabled_sources) & all_sources if enabled_sources else all_sources
+    active = set(enabled_sources) & all_sources if enabled_sources is not None else all_sources
 
     sources = {"faq": [], "documents": [], "database": None}
 
@@ -72,7 +75,6 @@ async def unified_query(
 
     if db_evidence:
         evidence.extend(db_evidence)
-        # Only include very relevant doc chunks alongside DB results
         high_quality_docs = []
         for i, chunk in enumerate(sources["documents"]):
             if chunk.get("score", 0) >= 0.55:
@@ -81,43 +83,79 @@ async def unified_query(
     else:
         evidence.extend(doc_evidence)
 
-    # 4. Generate answer using LLM
-    if not evidence:
-        return {
-            "answer": "I couldn't find any relevant information to answer your question. "
-                      "Please try rephrasing or ask about a topic covered in your uploaded documents, FAQ, or database.",
-            "sources": sources,
-        }
+    # Build a short schema summary so the LLM always knows what data exists,
+    # even when no rows matched the specific question.
+    schema_summary = ""
+    if company_id:
+        ds_result = await db.execute(
+            select(Dataset).where(Dataset.company_id == company_id, Dataset.is_queryable == True)
+        )
+        all_datasets = ds_result.scalars().all()
+        if all_datasets:
+            parts = []
+            for ds in all_datasets:
+                col_names = [c.get("name", "") for c in (ds.columns_schema or [])]
+                parts.append(f'- {ds.display_name} ({ds.row_count} rows): columns {", ".join(col_names[:12])}')
+            schema_summary = "Available database tables:\n" + "\n".join(parts)
+
+    # 4. If user wants raw data only (no AI insights), return immediately
+    if not ai_insights:
+        if not evidence:
+            return {
+                "answer": "No matching data found. Try a different question or enable AI Insights for general knowledge answers.",
+                "sources": sources,
+                "model_tier": "instant",
+            }
+        return {"answer": "\n\n".join(evidence), "sources": sources, "model_tier": "instant"}
+
+    # 5. Generate answer using LLM — ALWAYS call the model
+    has_evidence = bool(evidence)
+    if model_mode == "instant":
+        use_fast = True
+    elif model_mode == "thinking":
+        use_fast = False
+    else:
+        # Auto mode: if user enabled any company sources (FAQ/docs/database), prefer instant mode.
+        # Reserve thinking mode mainly for AI-only (no selected sources).
+        use_fast = bool(active)
 
     try:
         from app.llm.ollama_client import generate
 
-        context = "\n\n".join(evidence)
-        prompt = f"""Based on the following information, answer the user's question clearly and helpfully.
+        if has_evidence:
+            context = "\n\n".join(evidence)
+            prompt = f"""Data:\n{context}
 
-Rules:
-- If there are Database results, focus on those and present the data clearly (use bullet points or a list).
-- If there are Document results, mention the document name and page number.
-- Do NOT show any SQL queries.
-- If the context contains unrelated information, ignore it and only use what is relevant to the question.
-- Be concise.
+Question: {question}
 
-Context:
-{context}
+Answer concisely. Use bullet points for tabular data. You may add a short insight."""
+            system_msg = "You are ANDAI, a concise knowledge assistant. Present data clearly. Be brief."
+        else:
+            prompt = f"""{schema_summary}
 
-User's question: {question}
+No matching records found. Question: {question}
 
-Answer:"""
+Answer from general knowledge. If relevant tables exist above, suggest how to rephrase."""
+            system_msg = (
+                "You are ANDAI, a concise knowledge assistant. "
+                "No data? Use general knowledge. Never show SQL. Be brief."
+            )
 
-        answer = await generate(
-            prompt,
-            system="You are AskAI, a helpful knowledge assistant. Only use information from the provided context that is relevant to the question. Be concise and clear.",
-        )
-        return {"answer": answer, "sources": sources}
+        answer = await generate(prompt, system=system_msg, fast=use_fast)
+        model_tier = "instant" if use_fast else "thinking"
+        return {"answer": answer, "sources": sources, "model_tier": model_tier}
 
     except ConnectionError:
-        combined = "\n\n".join(evidence)
-        return {"answer": f"[LLM offline — showing raw results]\n\n{combined}", "sources": sources}
+        if evidence:
+            combined = "\n\n".join(evidence)
+            return {"answer": f"[LLM offline — showing raw results]\n\n{combined}", "sources": sources, "model_tier": "instant"}
+        return {"answer": "The AI service is currently offline. Please try again later.", "sources": sources, "model_tier": "instant"}
+    except Exception as llm_err:
+        logger.error(f"LLM generation error: {llm_err}")
+        if evidence:
+            combined = "\n\n".join(evidence)
+            return {"answer": f"[LLM error — showing raw results]\n\n{combined}", "sources": sources, "model_tier": "instant"}
+        return {"answer": f"An error occurred while generating the answer. Please try again.", "sources": sources, "model_tier": "instant"}
 
 
 def _format_rows_for_llm(rows: list[dict], max_rows: int = 30) -> str:
@@ -200,8 +238,8 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
                     })
             return results
 
-        except ConnectionError:
-            logger.warning("Ollama unavailable for query embedding — keyword fallback")
+        except Exception as emb_err:
+            logger.warning(f"Embedding failed — keyword fallback: {emb_err}")
 
     # Keyword fallback
     q_lower = question.lower()
@@ -245,26 +283,8 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
         col_names = [c.get("name", "") for c in cols]
         col_details = ", ".join(f'"{n}" ({c.get("type", "text")})' for n, c in zip(col_names, cols))
 
-        # Fetch 2 sample rows with column headers so the LLM sees exact column names with data
-        sample_hint = ""
-        try:
-            if col_names:
-                col_list = ", ".join(f'"{c}"' for c in col_names)
-                sample_sql = f'SELECT {col_list} FROM "{ds.table_name}" LIMIT 2'
-                async with engine.begin() as conn:
-                    sample_res = await conn.execute(text(sample_sql))
-                    sample_rows = sample_res.fetchall()
-                    if sample_rows:
-                        header = " | ".join(col_names)
-                        rows_str = []
-                        for row in sample_rows:
-                            rows_str.append(" | ".join(str(v) for v in row))
-                        sample_hint = f"\n  Columns: {header}\n  Row 1: {rows_str[0]}" + (f"\n  Row 2: {rows_str[1]}" if len(rows_str) > 1 else "")
-        except Exception:
-            pass
-
         schema_desc.append(
-            f'Table "{ds.table_name}" (name: {ds.display_name}, {ds.row_count} rows): [{col_details}]{sample_hint}'
+            f'Table "{ds.table_name}" ({ds.row_count} rows): [{col_details}]'
         )
 
     schema_text = "\n".join(schema_desc)
@@ -281,27 +301,14 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
     try:
         from app.llm.ollama_client import generate
 
-        sql_prompt = f"""You have these PostgreSQL tables:
-{schema_text}
-{table_hint}
+        sql_prompt = f"""Tables:
+{schema_text}{table_hint}
 
-The user asks: "{question}"
+Q: "{question}"
 
-Write a SQL SELECT query to answer this.
+Return ONLY a SELECT query (double-quote identifiers, LIMIT 100) or NONE."""
 
-Rules:
-- ONLY SELECT statements
-- Always double-quote table and column names
-- Add LIMIT 100
-- If listing items, select useful columns (name, price, quantity, etc.)
-- If the user asks "what do you have" or "list items" — return all rows from the relevant table
-- For "what do students say" or feedback questions, query the comments/feedback table and include comment_text and lecturer_name or course_name.
-- Return ONLY the SQL query, no explanation
-- If not answerable from these tables, return: NONE
-
-SQL:"""
-
-        sql = await generate(sql_prompt, system="You are a PostgreSQL expert. Return only a valid SQL SELECT query.")
+        sql = await generate(sql_prompt, system="PostgreSQL expert. Return only SQL, no explanation.", max_tokens=150, fast=True)
         sql = sql.strip()
         if sql.startswith("```"):
             sql = sql.strip("`").strip()

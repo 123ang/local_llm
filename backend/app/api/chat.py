@@ -11,12 +11,11 @@ from app.models.user import User
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 @router.get("/sessions", response_model=list[ChatSessionOut])
-async def list_sessions(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(ChatSession)
-        .where(ChatSession.user_id == current_user.id)
-        .order_by(ChatSession.updated_at.desc())
-    )
+async def list_sessions(company_id: int | None = None, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    query = select(ChatSession).where(ChatSession.user_id == current_user.id)
+    if company_id is not None:
+        query = query.where(ChatSession.company_id == company_id)
+    result = await db.execute(query.order_by(ChatSession.updated_at.desc()))
     sessions = result.scalars().all()
     out = []
     for s in sessions:
@@ -64,13 +63,17 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
             company_id=query_company_id,
             db=db,
             enabled_sources=data.sources,
+            ai_insights=data.ai_insights,
+            model_mode=data.model_mode,
         )
         answer = result.get("answer", "I couldn't find an answer to that question.")
         sources = result.get("sources")
-        sql_generated = None  # Don't expose raw SQL to users
+        model_tier = result.get("model_tier")
+        sql_generated = None
     except Exception as e:
         answer = f"I'm sorry, I encountered an error processing your question. The LLM service may not be available. Error: {str(e)}"
         sources = None
+        model_tier = None
         sql_generated = None
     
     elapsed = int((time.time() - start) * 1000)
@@ -83,7 +86,7 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
     db.add(assistant_msg)
     await db.commit()
     
-    return ChatResponse(session_id=session.id, message=answer, sources=sources, sql_generated=sql_generated, response_time_ms=elapsed)
+    return ChatResponse(session_id=session.id, message=answer, sources=sources, sql_generated=sql_generated, response_time_ms=elapsed, model_tier=model_tier)
 
 @router.delete("/sessions/{session_id}", status_code=204)
 async def delete_session(session_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):

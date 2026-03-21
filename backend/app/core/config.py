@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "AskAI"
+    PROJECT_NAME: str = "Adaptive Neural Decision AI"
     API_PREFIX: str = "/api"
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:920214@localhost:5432/askai"
@@ -17,12 +17,15 @@ class Settings(BaseSettings):
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     LLM_MODEL: str = "llama3"
+    LLM_MODEL_FAST: str = "qwen2.5-coder:1.5b"
     EMBEDDING_MODEL: str = "nomic-embed-text"
 
     CHROMA_PERSIST_DIR: str = "./storage/chromadb"
     UPLOAD_DIR: str = "./storage/uploads"
 
     FRONTEND_URL: str = "http://localhost:3000"
+    # Comma-separated extra allowed CORS origins (e.g. https://www.andai.my)
+    CORS_EXTRA_ORIGINS: str = ""
 
     SUPER_ADMIN_EMAIL: str = "admin@askai.local"
     SUPER_ADMIN_PASSWORD: str = "admin123"

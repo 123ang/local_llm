@@ -1,6 +1,6 @@
 """
 Script to create two companies and load their data:
-1. UUM utlc - loads uum_db.sql
+1. UUM - loads uum_db.sql
 2. Kedah Investment - loads investment CSV (after processing)
 """
 import asyncio
@@ -47,11 +47,18 @@ async def create_companies(db: AsyncSession):
     print("Creating companies...")
     
     # Check if companies already exist
-    result = await db.execute(select(Company).where(Company.name == "UUM utlc"))
+    result = await db.execute(select(Company).where(Company.name == "UUM"))
     uum_company = result.scalar_one_or_none()
-    
     if not uum_company:
-        uum_company = await create_company(db, name="UUM utlc", description="UUM database company")
+        result = await db.execute(select(Company).where(Company.name == "UUM utlc"))
+        uum_company = result.scalar_one_or_none()
+        if uum_company:
+            uum_company.name = "UUM"
+            await db.commit()
+            await db.refresh(uum_company)
+            print("[OK] Renamed company UUM utlc -> UUM")
+    if not uum_company:
+        uum_company = await create_company(db, name="UUM", description="UUM database company")
         print(f"[OK] Created company: {uum_company.name} (ID: {uum_company.id})")
     else:
         print(f"[OK] Company already exists: {uum_company.name} (ID: {uum_company.id})")

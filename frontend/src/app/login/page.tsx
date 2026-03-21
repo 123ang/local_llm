@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bot, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { BrandLogo } from "@/components/BrandLogo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -31,13 +32,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex" style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}>
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="max-w-md w-full">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-red-600 mb-4">
-              <Bot size={32} className="text-white" />
-            </div>
-            <h1 className="text-3xl font-bold text-white">AskAI</h1>
-            <p className="text-slate-400 mt-2">AI Knowledge Platform</p>
-          </div>
+          <BrandLogo variant="login" />
 
           <form onSubmit={handleSubmit} className="bg-white/10 backdrop-blur-xl rounded-2xl p-8 border border-white/20">
             {error && (
