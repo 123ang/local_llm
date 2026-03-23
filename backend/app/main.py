@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base, async_session
-from app.core.logger import logger
+from app.core.logger import logger, security_logger, install_access_log_probe_filter
+from app.core.probe_detection import is_suspicious_probe_path
 
 from app.api.auth import router as auth_router
 from app.api.companies import router as companies_router
@@ -59,6 +60,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def security_probe_logger(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if is_suspicious_probe_path(path):
+        client_ip = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "-")
+        security_logger.info(
+            f'probe_detected ip={client_ip} method={request.method} path="{path}" status={response.status_code} ua="{user_agent}"'
+        )
+    return response
+
+
 app.include_router(auth_router, prefix=settings.API_PREFIX)
 app.include_router(companies_router, prefix=settings.API_PREFIX)
 app.include_router(users_router, prefix=settings.API_PREFIX)
@@ -68,6 +83,8 @@ app.include_router(datasets_router, prefix=settings.API_PREFIX)
 app.include_router(chat_router, prefix=settings.API_PREFIX)
 app.include_router(audit_router, prefix=settings.API_PREFIX)
 app.include_router(status_router, prefix=settings.API_PREFIX)
+
+install_access_log_probe_filter()
 
 
 @app.get("/health")
