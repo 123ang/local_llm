@@ -1,3 +1,5 @@
+import re
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import engine
@@ -314,6 +316,9 @@ Return ONLY a SELECT query (double-quote identifiers, LIMIT 100) or NONE."""
             sql = sql.strip("`").strip()
         if sql.lower().startswith("sql"):
             sql = sql[3:].strip()
+        # Models often emit "SELECT ...;\nLIMIT 100" — the semicolon ends the first statement and breaks Postgres.
+        sql = re.sub(r";\s*\r?\n\s*", " ", sql)
+        sql = re.sub(r"\s+", " ", sql).strip()
         sql = sql.rstrip(";`").strip()
 
         if not sql or sql.upper().strip() == "NONE" or not sql.upper().lstrip().startswith("SELECT"):

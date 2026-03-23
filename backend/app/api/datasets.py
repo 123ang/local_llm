@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import get_db, engine
 from app.core.dependencies import require_admin
+from app.core.security import get_current_user
 from app.core.config import settings
 from app.schemas.dataset import DatasetCreateManual, DatasetOut, DatasetImportOut, CSVPreviewOut, SQLPreviewOut, SQLTablePreview
 from app.models.dataset import Dataset, DatasetImport
@@ -30,7 +31,7 @@ def _safe_table_name(company_id: int, name: str) -> str:
     return f"c{company_id}_{clean}"
 
 @router.get("/{company_id}", response_model=list[DatasetOut])
-async def list_datasets(company_id: int, current_user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+async def list_datasets(company_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Dataset).where(Dataset.company_id == company_id).order_by(Dataset.created_at.desc()))
     return list(result.scalars().all())
 

@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AskAI / ANDAI Web User Manual</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11pt;
+      line-height: 1.5;
+      color: #222;
+      margin: 40px;
+    }
+    h1, h2, h3, h4 {
+      color: #111827;
+      margin-top: 1.1em;
+      margin-bottom: 0.35em;
+    }
+    h1 {
+      font-size: 24pt;
+      text-align: center;
+      margin-top: 120px;
+    }
+    h2 {
+      font-size: 18pt;
+      border-bottom: 1px solid #d1d5db;
+      padding-bottom: 4px;
+    }
+    h3 {
+      font-size: 14pt;
+    }
+    h4 {
+      font-size: 12pt;
+    }
+    p {
+      margin: 0.35em 0 0.7em;
+    }
+    ul, ol {
+      margin: 0.3em 0 0.9em 1.4em;
+    }
+    li {
+      margin: 0.2em 0;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 0.8em 0 1.2em;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background: #f3f4f6;
+      font-weight: bold;
+    }
+    .cover-meta {
+      text-align: center;
+      margin-top: 24px;
+      color: #4b5563;
+    }
+    .note {
+      border-left: 4px solid #dc2626;
+      background: #fef2f2;
+      padding: 10px 12px;
+      margin: 1em 0;
+    }
+    .page-break {
+      page-break-after: always;
+    }
+    .toc ol {
+      margin-left: 1.2em;
+    }
+    .small {
+      font-size: 10pt;
+      color: #6b7280;
+    }
+    figure {
+      margin: 1em 0 1.5em;
+      text-align: center;
+    }
+    figure img {
+      width: 100%;
+      max-width: 980px;
+      border: 1px solid #d1d5db;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+    figcaption {
+      margin-top: 8px;
+      font-size: 10pt;
+      color: #4b5563;
+    }
+  </style>
+</head>
+<body>
+  <h1>AskAI / ANDAI Web User Manual</h1>
+  <div class="cover-meta">
+    <p><strong>Version:</strong> 1.0</p>
+    <p><strong>Project:</strong> local_llm</p>
+    <p><strong>Platform:</strong> Web knowledge assistant powered by FastAPI, PostgreSQL, and Ollama</p>
+    <p><strong>Prepared on:</strong> March 22, 2026</p>
+    <p><strong>Prepared for:</strong> AskAI / ANDAI deployment and administration team</p>
+  </div>
+
+  <div class="page-break"></div>
+
+  <h2>Contents</h2>
+  <div class="toc">
+    <ol>
+      <li>Introduction</li>
+      <li>Basic Information</li>
+      <li>Getting Started</li>
+      <li>Dashboard Overview</li>
+      <li>Using the Assistant</li>
+      <li>Managing Documents</li>
+      <li>Managing FAQ</li>
+      <li>Managing Database Tables and Data</li>
+      <li>Platform Administration</li>
+      <li>Account Management</li>
+      <li>Troubleshooting</li>
+    </ol>
+  </div>
+
+  <h2>Table of Figures</h2>
+  <div class="toc">
+    <ol>
+      <li>Login page</li>
+      <li>Dashboard overview</li>
+      <li>Assistant page</li>
+      <li>Documents page</li>
+      <li>FAQ page</li>
+      <li>Database tables page</li>
+      <li>Database upload table and data page</li>
+      <li>Companies page</li>
+      <li>Users page</li>
+      <li>Audit logs page</li>
+    </ol>
+  </div>
+
+  <div class="page-break"></div>
+
+  <h2>1. Introduction</h2>
+  <p>
+    Welcome to AskAI / ANDAI. This platform lets organizations ask natural-language questions and receive
+    grounded answers from three main sources: curated FAQ entries, uploaded PDF documents, and structured
+    database tables. The system is designed for internal knowledge use cases such as policy guidance,
+    operating procedures, reporting instructions, and data lookup.
+  </p>
+  <p>
+    This manual follows the style of a practical product user guide. It explains how to sign in, navigate
+    the dashboard, use the assistant, manage knowledge content, and administer companies and users.
+  </p>
+
+  <h3>1.1 Key Features</h3>
+  <ul>
+    <li>Hybrid question answering across FAQ, PDF documents, and structured data.</li>
+    <li>Multi-tenant company separation so each company sees only its own data.</li>
+    <li>Local LLM deployment using Ollama, so the system can run on your own infrastructure.</li>
+    <li>PDF upload, parsing, chunking, and semantic retrieval.</li>
+    <li>CSV and SQL import for structured data analysis.</li>
+    <li>Role-based access for standard users, admins, and super admins.</li>
+    <li>Audit logging for important platform activity.</li>
+    <li>System status visibility for backend API, Ollama, database, and Redis.</li>
+  </ul>
+
+  <h2>2. Basic Information</h2>
+
+  <h3>2.1 System Requirements</h3>
+  <p>To use the AskAI web platform, you need:</p>
+  <ul>
+    <li>A modern web browser such as Google Chrome, Microsoft Edge, Mozilla Firefox, or Safari.</li>
+    <li>A stable network connection to the deployed application.</li>
+    <li>Valid user credentials provided by your platform administrator.</li>
+    <li>For administrators: PDF, CSV, or SQL files to upload when managing knowledge sources.</li>
+  </ul>
+
+  <h3>2.2 Accessing the System</h3>
+  <p>
+    Open your browser and navigate to the deployment URL assigned to your organization. Depending on the
+    environment, this may be:
+  </p>
+  <ul>
+    <li>A production domain such as <strong>https://andai.my</strong></li>
+    <li>A customer-specific or white-label domain</li>
+    <li>A local development URL such as <strong>http://localhost:3000</strong></li>
+  </ul>
+  <p>
+    After the page loads, you will see the sign-in screen with fields for email and password.
+  </p>
+
+  <h3>2.3 User Roles</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Role</th>
+        <th>Main Access</th>
+        <th>Typical Use</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Standard User</td>
+        <td>Overview, Assistant</td>
+        <td>Ask questions and review answers for the assigned company.</td>
+      </tr>
+      <tr>
+        <td>Admin</td>
+        <td>Standard User access plus Documents, FAQ, Database</td>
+        <td>Maintain company knowledge sources and structured data.</td>
+      </tr>
+      <tr>
+        <td>Super Admin</td>
+        <td>All modules including Companies, Users, Audit Logs</td>
+        <td>Manage platform-wide tenants, users, and oversight.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <strong>Note:</strong> In local development, the default bootstrap account is
+    <strong>admin@askai.local</strong> with password <strong>admin123</strong>. In production, users should sign in
+    with credentials provided by an administrator.
+  </div>
+
+  <h2>3. Getting Started</h2>
+
+  <h3>3.1 Signing In</h3>
+  <ol>
+    <li>Open the AskAI web URL in your browser.</li>
+    <li>Enter your email address.</li>
+    <li>Enter your password.</li>
+    <li>Click <strong>Sign in</strong>.</li>
+    <li>If authentication succeeds, you will be redirected to the dashboard.</li>
+  </ol>
+  <p>
+    If the system rejects your credentials, it will show an error message on the login form.
+  </p>
+  <figure>
+    <img src="manual_screenshots/01-login.png" alt="AskAI login page">
+    <figcaption>Figure 1: AskAI login page.</figcaption>
+  </figure>
+
+  <h3>3.2 Company Selection</h3>
+  <p>
+    Company selection depends on your role:
+  </p>
+  <ul>
+    <li><strong>Standard users</strong> usually work within their assigned company automatically.</li>
+    <li><strong>Super admins</strong> can switch between companies using the company selector in the top bar.</li>
+  </ul>
+  <p>
+    The selected company controls which documents, FAQ items, datasets, and assistant results are visible.
+  </p>
+
+  <h3>3.3 Navigation</h3>
+  <p>
+    After login, the left sidebar shows the modules available to your role.
+  </p>
+  <ul>
+    <li><strong>Main:</strong> Overview, Assistant</li>
+    <li><strong>Administration:</strong> Documents, FAQ, Database</li>
+    <li><strong>Platform:</strong> Companies, Users, Audit Logs</li>
+  </ul>
+  <p>
+    The bottom of the sidebar shows your name, email, role, and a <strong>Sign out</strong> button.
+  </p>
+
+  <h2>4. Dashboard Overview</h2>
+  <p>
+    The Overview page is the first screen after login. It gives a quick summary of your knowledge platform
+    and links to the most common actions.
+  </p>
+
+  <h3>4.1 Dashboard Features</h3>
+  <p>The dashboard includes the following sections:</p>
+  <ol>
+    <li><strong>Welcome Header</strong> - shows the logged-in user name and a short summary line.</li>
+    <li><strong>Statistics Cards</strong> - shows counts for Documents, FAQ Items, Datasets, and Chat Sessions.</li>
+    <li><strong>Quick Start</strong> - provides shortcuts to Ask a Question, Upload Document, and Import Data.</li>
+    <li><strong>System Status</strong> - shows live health indicators for Backend API, Ollama, Database, and Redis.</li>
+  </ol>
+  <figure>
+    <img src="manual_screenshots/02-overview.png" alt="AskAI dashboard overview">
+    <figcaption>Figure 2: Dashboard overview with statistics, quick start, and system status.</figcaption>
+  </figure>
+
+  <h3>4.2 System Status</h3>
+  <p>
+    The status panel checks whether the main services are available:
+  </p>
+  <ul>
+    <li><strong>Backend API</strong> - should be online whenever the web app is working correctly.</li>
+    <li><strong>Ollama LLM</strong> - shows whether the local model service is connected and which models are available.</li>
+    <li><strong>Database</strong> - shows the PostgreSQL connection status and version string.</li>
+    <li><strong>Redis</strong> - shows whether the background queue/cache service is running.</li>
+  </ul>
+  <p>
+    If a service is unavailable, administrators should investigate before using features that depend on it.
+  </p>
+
+  <h2>5. Using the Assistant</h2>
+  <p>
+    The Assistant is the main end-user feature. It lets you ask questions in natural language and receive
+    responses generated from company knowledge sources.
+  </p>
+
+  <h3>5.1 Assistant Interface</h3>
+  <p>The Assistant page has two main areas:</p>
+  <ul>
+    <li><strong>Session Sidebar</strong> - lists previous chat sessions and includes a <strong>New Chat</strong> button.</li>
+    <li><strong>Chat Area</strong> - shows the conversation, answer content, sources, and the input box.</li>
+  </ul>
+  <p>
+    If there are no messages yet, the page displays suggested example questions to help you get started.
+  </p>
+  <figure>
+    <img src="manual_screenshots/03-assistant.png" alt="AskAI assistant page">
+    <figcaption>Figure 3: Assistant page with chat sessions, prompt suggestions, source filters, and model controls.</figcaption>
+  </figure>
+
+  <h3>5.2 Starting a New Chat</h3>
+  <ol>
+    <li>Open the <strong>Assistant</strong> page from the sidebar.</li>
+    <li>Click <strong>New Chat</strong> in the left panel.</li>
+    <li>Type your question into the message box.</li>
+    <li>Click the send button or press <strong>Enter</strong>.</li>
+  </ol>
+  <p>
+    The system creates a new session automatically when you send the first message.
+  </p>
+
+  <h3>5.3 Choosing Search Sources</h3>
+  <p>
+    Above the message box, you can control which knowledge sources the assistant should search:
+  </p>
+  <ul>
+    <li><strong>Database</strong> - structured tables and imported datasets</li>
+    <li><strong>PDF / Docs</strong> - uploaded documents that were parsed and indexed</li>
+    <li><strong>FAQ</strong> - curated question and answer pairs</li>
+  </ul>
+  <p>
+    You can enable one or more of these based on the type of question you want to ask.
+  </p>
+
+  <h3>5.4 AI Insights and Model Mode</h3>
+  <p>
+    The Assistant includes additional controls:
+  </p>
+  <ul>
+    <li><strong>AI Insights</strong> - when enabled, the system synthesizes a cleaner answer from the retrieved evidence.</li>
+    <li><strong>Model Mode: Auto</strong> - lets the system choose the most suitable response mode.</li>
+    <li><strong>Model Mode: Instant</strong> - prefers faster responses.</li>
+    <li><strong>Model Mode: Thinking</strong> - allows a deeper response strategy when supported.</li>
+  </ul>
+  <p>
+    For most daily use, leave the default settings on <strong>AI Insights</strong> and <strong>Auto</strong>.
+  </p>
+
+  <h3>5.5 Reading the Answer</h3>
+  <p>
+    Assistant answers may include:
+  </p>
+  <ul>
+    <li>Plain-language response text</li>
+    <li>Database result tables for structured answers</li>
+    <li>Source badges showing FAQ count, document names/pages, or database row counts</li>
+    <li>Model tier tags such as <strong>Instant</strong> or <strong>Thinking</strong></li>
+    <li>Approximate response time in seconds</li>
+  </ul>
+  <p>
+    Use the source badges to understand where the answer came from and whether it relied on FAQ, documents,
+    or database tables.
+  </p>
+
+  <h3>5.6 Managing Chat Sessions</h3>
+  <ol>
+    <li>Use the left sidebar to review previous sessions.</li>
+    <li>Click a session title to reopen it.</li>
+    <li>Click the delete icon next to a session to remove it.</li>
+  </ol>
+  <p>
+    Deleted sessions are removed from the session list and cannot be restored through the current interface.
+  </p>
+
+  <h2>6. Managing Documents</h2>
+  <p>
+    The Documents module is available to admins and super admins. It is used to upload and maintain PDF files
+    that the assistant can search semantically.
+  </p>
+
+  <h3>6.1 Uploading a PDF</h3>
+  <ol>
+    <li>Open <strong>Documents</strong> from the sidebar.</li>
+    <li>Ensure the correct company is selected.</li>
+    <li>Click <strong>Upload PDF</strong>.</li>
+    <li>Select a PDF file from your computer.</li>
+    <li>Wait for the upload to finish and the file to appear in the document table.</li>
+  </ol>
+  <p>
+    Only PDF files are accepted in this module.
+  </p>
+  <figure>
+    <img src="manual_screenshots/04-documents.png" alt="AskAI documents page">
+    <figcaption>Figure 4: Documents page showing uploaded PDFs, processing status, and document actions.</figcaption>
+  </figure>
+
+  <h3>6.2 Processing Status</h3>
+  <p>
+    After upload, each document moves through one of these states:
+  </p>
+  <ul>
+    <li><strong>Pending</strong> - waiting to be processed</li>
+    <li><strong>Processing</strong> - the system is parsing pages, creating chunks, and generating embeddings</li>
+    <li><strong>Ready</strong> - the document is fully searchable in the Assistant</li>
+    <li><strong>Error</strong> - processing failed and needs attention</li>
+  </ul>
+  <p>
+    The page auto-refreshes while documents are still processing.
+  </p>
+
+  <h3>6.3 Reprocessing a Document</h3>
+  <ol>
+    <li>Locate a document with <strong>Pending</strong> or <strong>Error</strong> status.</li>
+    <li>Click the retry or refresh icon in the Actions column.</li>
+    <li>Wait for the document to re-enter the processing pipeline.</li>
+  </ol>
+
+  <h3>6.4 Deleting a Document</h3>
+  <ol>
+    <li>Click the delete icon on the target document row.</li>
+    <li>Confirm the deletion when prompted.</li>
+  </ol>
+  <p>
+    Deleting a document also removes its stored chunks from the knowledge base.
+  </p>
+
+  <h2>7. Managing FAQ</h2>
+  <p>
+    The FAQ module stores approved question-and-answer pairs that the assistant can use directly.
+  </p>
+
+  <h3>7.1 Adding a FAQ Item</h3>
+  <ol>
+    <li>Open <strong>FAQ</strong> from the sidebar.</li>
+    <li>Click <strong>Add FAQ</strong>.</li>
+    <li>Fill in the following fields:</li>
+  </ol>
+  <ul>
+    <li><strong>Question</strong> - the user-facing question</li>
+    <li><strong>Answer</strong> - the approved answer text</li>
+    <li><strong>Category</strong> - optional grouping label</li>
+    <li><strong>Published</strong> - whether the FAQ should be available to the assistant</li>
+  </ul>
+  <ol start="4">
+    <li>Click <strong>Save</strong>.</li>
+  </ol>
+  <figure>
+    <img src="manual_screenshots/05-faq.png" alt="AskAI FAQ page">
+    <figcaption>Figure 5: FAQ page with the FAQ list and actions for add, edit, publish, and delete.</figcaption>
+  </figure>
+
+  <h3>7.2 Editing a FAQ Item</h3>
+  <ol>
+    <li>Find the FAQ entry you want to change.</li>
+    <li>Click the edit icon.</li>
+    <li>Update the question, answer, category, or publication state.</li>
+    <li>Click <strong>Save</strong>.</li>
+  </ol>
+
+  <h3>7.3 Publishing or Saving as Draft</h3>
+  <p>
+    FAQ items can be active or hidden from the assistant:
+  </p>
+  <ul>
+    <li>If <strong>Published</strong> is enabled, the assistant can use the FAQ when answering.</li>
+    <li>If <strong>Published</strong> is disabled, the item remains as a draft.</li>
+  </ul>
+  <p>
+    You can toggle this state quickly using the eye / eye-off icon on each FAQ card.
+  </p>
+
+  <h3>7.4 Deleting a FAQ Item</h3>
+  <ol>
+    <li>Click the delete icon on the FAQ entry.</li>
+    <li>Confirm the deletion.</li>
+  </ol>
+
+  <h2>8. Managing Database Tables and Data</h2>
+  <p>
+    The Database module allows admins to create tables manually, import tables from CSV or SQL, append or
+    replace table data, and preview stored rows.
+  </p>
+
+  <h3>8.1 Tables Overview</h3>
+  <p>
+    The <strong>Tables</strong> tab shows all datasets for the selected company, including:
+  </p>
+  <ul>
+    <li>Display name and physical table name</li>
+    <li>Number of columns</li>
+    <li>Row count</li>
+    <li>Source type</li>
+    <li>Status</li>
+  </ul>
+  <p>
+    Click <strong>View data</strong> to open a paginated modal showing rows from the selected table.
+  </p>
+  <figure>
+    <img src="manual_screenshots/06-database-tables.png" alt="AskAI database tables page">
+    <figcaption>Figure 6: Database tables page showing imported datasets and the view data action.</figcaption>
+  </figure>
+
+  <h3>8.2 Creating a Table Manually</h3>
+  <ol>
+    <li>Open the <strong>Create Table</strong> tab.</li>
+    <li>Enter a display name and optional description.</li>
+    <li>Add one or more columns.</li>
+    <li>For each column, define the name, data type, and whether null values are allowed.</li>
+    <li>Click <strong>Create Table</strong>.</li>
+  </ol>
+  <p>
+    Supported column types include Text, Integer, Float, Boolean, Date, and Timestamp.
+  </p>
+
+  <h3>8.3 Uploading a Table from CSV or SQL</h3>
+  <ol>
+    <li>Open the <strong>Upload Table &amp; Data</strong> tab.</li>
+    <li>Enter a display name and optional description.</li>
+    <li>Select a CSV or SQL file.</li>
+    <li>Review the preview that appears:</li>
+  </ol>
+  <ul>
+    <li><strong>CSV preview</strong> shows row count, columns, and sample rows.</li>
+    <li><strong>SQL preview</strong> shows detected tables, row counts, target names, and sample rows.</li>
+  </ul>
+  <ol start="5">
+    <li>Click <strong>Create Table &amp; Import</strong> for CSV, or <strong>Import SQL Tables</strong> for SQL.</li>
+  </ol>
+  <p>
+    If some SQL tables have import problems, the page shows a list of table-level errors for review.
+  </p>
+  <figure>
+    <img src="manual_screenshots/07-database-upload.png" alt="AskAI database upload page">
+    <figcaption>Figure 7: Database upload page for importing CSV or SQL tables with file preview.</figcaption>
+  </figure>
+
+  <h3>8.4 Uploading Data to an Existing Table</h3>
+  <ol>
+    <li>Open the <strong>Upload Data</strong> tab.</li>
+    <li>Select the target table.</li>
+    <li>Choose a CSV file.</li>
+    <li>Select the import mode:</li>
+  </ol>
+  <ul>
+    <li><strong>Append</strong> - adds new rows to the existing table</li>
+    <li><strong>Replace</strong> - replaces existing table data with the imported file</li>
+  </ul>
+  <ol start="5">
+    <li>Click <strong>Import Data</strong>.</li>
+  </ol>
+
+  <h3>8.5 Viewing Table Data</h3>
+  <p>
+    When you click <strong>View data</strong> on a table, the system opens a modal window showing:
+  </p>
+  <ul>
+    <li>Display name and physical table name</li>
+    <li>Visible rows and total row count</li>
+    <li>Paginated navigation</li>
+    <li>A preview grid of values for each column</li>
+  </ul>
+
+  <h2>9. Platform Administration</h2>
+  <p>
+    The following modules are intended mainly for super admins.
+  </p>
+
+  <h3>9.1 Managing Companies</h3>
+  <ol>
+    <li>Open <strong>Companies</strong> from the sidebar.</li>
+    <li>Click <strong>Add Company</strong>.</li>
+    <li>Enter the company name and optional description.</li>
+    <li>Click <strong>Create</strong>.</li>
+  </ol>
+  <p>
+    The Companies page also shows the generated slug, creation date, and active/inactive state.
+    Use the toggle control in the last column to activate or deactivate a company.
+  </p>
+  <figure>
+    <img src="manual_screenshots/08-companies.png" alt="AskAI companies page">
+    <figcaption>Figure 8: Companies page for managing tenant records and activation status.</figcaption>
+  </figure>
+
+  <h3>9.2 Managing Users</h3>
+  <ol>
+    <li>Open <strong>Users</strong>.</li>
+    <li>Click <strong>Add User</strong>.</li>
+    <li>Fill in Full Name, Email, Password, Role, and Company.</li>
+    <li>Click <strong>Create User</strong>.</li>
+  </ol>
+  <p>
+    The Users table shows each user’s role, company, and activation status. Use the toggle control to enable
+    or disable a user account.
+  </p>
+  <figure>
+    <img src="manual_screenshots/09-users.png" alt="AskAI users page">
+    <figcaption>Figure 9: Users page showing role, company assignment, and account status.</figcaption>
+  </figure>
+
+  <h3>9.3 Viewing Audit Logs</h3>
+  <p>
+    The Audit Logs page records key events such as logins, company creation, user creation, document upload,
+    FAQ creation, and dataset import.
+  </p>
+  <p>The table includes:</p>
+  <ul>
+    <li>Timestamp</li>
+    <li>Action</li>
+    <li>Resource type and resource ID</li>
+    <li>User ID</li>
+    <li>Company ID</li>
+  </ul>
+  <p>
+    Click <strong>Refresh</strong> to reload the latest activity.
+  </p>
+  <figure>
+    <img src="manual_screenshots/10-audit-logs.png" alt="AskAI audit logs page">
+    <figcaption>Figure 10: Audit Logs page showing recorded platform activity.</figcaption>
+  </figure>
+
+  <h2>10. Account Management</h2>
+
+  <h3>10.1 Signing Out</h3>
+  <p>
+    To sign out, click <strong>Sign out</strong> at the bottom of the sidebar. This clears your saved login token
+    from the browser and returns you to the login page.
+  </p>
+
+  <h3>10.2 Session Expiry and Re-Login</h3>
+  <p>
+    If your session token becomes invalid or expires, the system automatically clears the stored token and
+    redirects you to the login page. Simply sign in again to continue.
+  </p>
+
+  <h2>11. Troubleshooting</h2>
+
+  <h3>11.1 Cannot Sign In</h3>
+  <ul>
+    <li>Check that your email and password are correct.</li>
+    <li>Make sure your account is active.</li>
+    <li>For local development, confirm that the default or assigned credentials are being used correctly.</li>
+  </ul>
+
+  <h3>11.2 No Company Selected</h3>
+  <ul>
+    <li>If you are a super admin, choose a company from the selector in the top bar.</li>
+    <li>If you are a standard user and still see no company data, check that your user account is assigned to a company.</li>
+  </ul>
+
+  <h3>11.3 Ollama Not Connected</h3>
+  <ul>
+    <li>Check the System Status panel on the Overview page.</li>
+    <li>If Ollama shows <strong>Not connected</strong>, verify that the Ollama service is running.</li>
+    <li>For local environments, administrators may need to start it with <strong>ollama serve</strong>.</li>
+  </ul>
+
+  <h3>11.4 A PDF Stays in Pending or Error</h3>
+  <ul>
+    <li>Use the retry action on the document row.</li>
+    <li>Check whether the uploaded file is a valid PDF.</li>
+    <li>Confirm Ollama is running, because embeddings are required for document search.</li>
+  </ul>
+
+  <h3>11.5 Chat Answers Are Weak or Missing</h3>
+  <ul>
+    <li>Make sure the correct company is selected.</li>
+    <li>Check that the right search sources are enabled.</li>
+    <li>Confirm FAQ items are published and documents are in <strong>Ready</strong> state.</li>
+    <li>For data questions, verify that the relevant tables were imported successfully.</li>
+  </ul>
+
+  <h3>11.6 Database Import Errors</h3>
+  <ul>
+    <li>Review the CSV or SQL preview before importing.</li>
+    <li>Check the error list shown after an SQL import if some tables fail.</li>
+    <li>Make sure your file columns and data types are consistent.</li>
+  </ul>
+
+  <div class="note">
+    <strong>Recommended first-use workflow:</strong> create or select a company, upload at least one PDF,
+    add a few FAQ entries, import a sample dataset if needed, then open the Assistant and ask a grounded
+    test question.
+  </div>
+
+  <p class="small">
+    End of manual. This document was created for the AskAI / ANDAI web application in the local_llm project.
+  </p>
+</body>
+</html>
