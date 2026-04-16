@@ -10,7 +10,7 @@ def _get_client() -> httpx.AsyncClient:
     if _client is None or _client.is_closed:
         _client = httpx.AsyncClient(
             base_url=settings.OLLAMA_BASE_URL,
-            timeout=httpx.Timeout(120, connect=10),
+            timeout=httpx.Timeout(300, connect=10),
         )
     return _client
 

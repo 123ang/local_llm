@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#DC2626</color>
+    <color name="primary_hover">#B91C1C</color>
+    <color name="primary_light">#FEF2F2</color>
+    <color name="accent">#F97316</color>
+
+    <color name="sidebar_bg">#1A1A2E</color>
+    <color name="sidebar_hover">#16213E</color>
+    <color name="deep_blue">#0F3460</color>
+
+    <color name="bg_main">#F8FAFC</color>
+    <color name="bg_card">#FFFFFF</color>
+
+    <color name="text_primary">#1E293B</color>
+    <color name="text_secondary">#64748B</color>
+
+    <color name="border">#E2E8F0</color>
+
+    <color name="slate50">#F8FAFC</color>
+    <color name="slate100">#F1F5F9</color>
+    <color name="slate200">#E2E8F0</color>
+    <color name="slate300">#CBD5E1</color>
+    <color name="slate400">#94A3B8</color>
+    <color name="slate500">#64748B</color>
+    <color name="slate700">#334155</color>
+
+    <color name="red50">#FEF2F2</color>
+    <color name="red100">#FEE2E2</color>
+    <color name="red200">#FECACA</color>
+    <color name="red400">#F87171</color>
+    <color name="red600">#DC2626</color>
+
+    <color name="emerald50">#ECFDF5</color>
+    <color name="emerald600">#059669</color>
+    <color name="emerald700">#047857</color>
+
+    <color name="blue50">#EFF6FF</color>
+    <color name="blue600">#2563EB</color>
+    <color name="blue700">#1D4ED8</color>
+
+    <color name="amber50">#FFFBEB</color>
+    <color name="amber600">#D97706</color>
+    <color name="amber700">#B45309</color>
+
+    <color name="purple50">#FAF5FF</color>
+    <color name="purple700">#7C3AED</color>
+
+    <color name="violet50">#F5F3FF</color>
+    <color name="violet600">#7C3AED</color>
+
+    <color name="white">#FFFFFF</color>
+    <color name="white_10">#1AFFFFFF</color>
+    <color name="white_20">#33FFFFFF</color>
+    <color name="white_30">#4DFFFFFF</color>
+</resources>

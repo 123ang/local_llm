@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
 
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    LLM_MODEL: str = "llama3"
+    LLM_MODEL: str = "gemma4:latest"
     LLM_MODEL_FAST: str = "qwen2.5-coder:1.5b"
     EMBEDDING_MODEL: str = "nomic-embed-text"
 

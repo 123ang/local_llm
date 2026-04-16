@@ -167,12 +167,14 @@ These must be installed and running on your machine:
 
 | Model | Size | Purpose |
 |-------|------|---------|
-| `llama3` | ~4.7 GB | Chat, answer generation, SQL generation |
+| `gemma4:latest` | ~9.6 GB | Chat, answer generation |
+| `qwen2.5-coder:1.5b` | ~1.5 GB | Text-to-SQL generation (code-specialized, fast) |
 | `nomic-embed-text` | ~274 MB | Document embedding for similarity search |
 
 Pull them with:
 ```bash
-ollama pull llama3
+ollama pull gemma4:latest
+ollama pull qwen2.5-coder:1.5b
 ollama pull nomic-embed-text
 ```
 
@@ -507,7 +509,8 @@ This is a known passlib/bcrypt compatibility warning. It's harmless — authenti
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
 | `SECRET_KEY` | (dev key) | JWT signing secret |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
-| `LLM_MODEL` | `llama3` | Chat model |
+| `LLM_MODEL` | `gemma4:latest` | Chat model |
+| `LLM_MODEL_FAST` | `qwen2.5-coder:1.5b` | Code-specialized model for SQL generation |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS allowed origin |
 | `SUPER_ADMIN_EMAIL` | `admin@askai.local` | Auto-created super admin |

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ANDAI</string>
+    <string name="tab_home">Home</string>
+    <string name="tab_assistant">Assistant</string>
+    <string name="tab_manage">Manage</string>
+    <string name="tab_settings">Settings</string>
+
+    <string name="overview_welcome_placeholder">Welcome back</string>
+    <string name="overview_welcome_title_fmt">Welcome back, %1$s</string>
+    <string name="overview_subtitle">Here is a snapshot of your workspace.</string>
+    <string name="stat_documents">Documents</string>
+    <string name="stat_faq">FAQ items</string>
+    <string name="stat_datasets">Datasets</string>
+    <string name="stat_sessions">Chat sessions</string>
+    <string name="overview_card_assistant_title">AI Assistant</string>
+    <string name="overview_card_assistant_desc">Ask questions across your documents, FAQ, and structured data.</string>
+    <string name="overview_card_manage_title">Management</string>
+    <string name="overview_card_manage_desc">Admins can manage knowledge sources, companies, and users.</string>
+
+    <string name="chat_sessions">Sessions</string>
+    <string name="chat_new">New chat</string>
+    <string name="chat_new_conversation">New conversation</string>
+    <string name="chat_empty_title">How can I help you?</string>
+    <string name="chat_suggest_1">What documents do we have?</string>
+    <string name="chat_suggest_2">Summarize our FAQ topics</string>
+    <string name="chat_suggest_3">What data is in our database?</string>
+    <string name="chat_typing">Thinking…</string>
+    <string name="source_database">Database</string>
+    <string name="source_docs">Docs</string>
+    <string name="source_faq">FAQ</string>
+    <string name="source_ai_insights">AI Insights</string>
+    <string name="model_mode_label">Model mode</string>
+    <string name="mode_auto">Auto</string>
+    <string name="mode_instant">Instant</string>
+    <string name="mode_thinking">Thinking</string>
+    <string name="chat_input_hint">Message</string>
+
+    <string name="title_documents">Documents</string>
+    <string name="title_faq">FAQ</string>
+    <string name="title_database">Database</string>
+    <string name="title_companies">Companies</string>
+    <string name="title_users">Users</string>
+    <string name="title_audit">Audit logs</string>
+    <string name="manage_title">Manage</string>
+    <string name="manage_documents_desc">Upload and manage PDF knowledge.</string>
+    <string name="manage_faq_desc">Create and publish frequently asked questions.</string>
+    <string name="manage_database_desc">Browse datasets and tabular data.</string>
+    <string name="manage_companies_desc">Super admin: create and edit companies.</string>
+    <string name="manage_users_desc">Invite users and assign roles.</string>
+    <string name="manage_audit_desc">Review security and admin actions.</string>
+
+    <string name="upload">Upload</string>
+    <string name="add">Add</string>
+    <string name="edit">Edit</string>
+    <string name="delete">Delete</string>
+    <string name="empty_documents">No documents yet. Upload a PDF to get started.</string>
+    <string name="empty_faq">No FAQ entries yet.</string>
+    <string name="empty_datasets">No datasets configured.</string>
+    <string name="logout">Log out</string>
+
+    <string name="settings_company_section">Company</string>
+    <string name="settings_switch_company">Switch company</string>
+    <string name="settings_server_section">Server</string>
+    <string name="settings_check_server">Check server status</string>
+    <string name="settings_about_section">About</string>
+    <string name="settings_about_body">ANDAI mobile connects to your FastAPI backend. Knowledge and chat responses depend on server configuration and models.</string>
+
+    <string name="published">Published</string>
+    <string name="draft">Draft</string>
+    <string name="active">Active</string>
+    <string name="inactive">Inactive</string>
+    <string name="chunks_label">%1$d chunks</string>
+    <string name="rows_cols_label">%1$d rows · %2$d columns</string>
+
+    <string name="chat_no_sessions">No saved sessions yet.</string>
+    <string name="error_parse">Could not read server data.</string>
+    <string name="error_no_company">No company selected.</string>
+    <string name="confirm_delete">Delete?</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="error_read_file">Could not read the selected file.</string>
+    <string name="upload_ok">Upload started. Processing may take a moment.</string>
+    <string name="question">Question</string>
+    <string name="answer">Answer</string>
+    <string name="category">Category</string>
+    <string name="company_name">Company name</string>
+    <string name="description">Description</string>
+    <string name="email">Email</string>
+    <string name="full_name">Full name</string>
+    <string name="password">Password</string>
+    <string name="role">Role</string>
+    <string name="company_id_hint">Company ID (super admin)</string>
+    <string name="published_label">Published</string>
+    <string name="error_required_fields">Please fill required fields.</string>
+    <string name="rows_total_fmt">Total rows (server): %1$d</string>
+    <string name="password_optional">Leave blank to keep</string>
+    <string name="password_required_new">Password is required for new users.</string>
+    <string name="audit_user_id_fmt">User #%1$d</string>
+    <string name="audit_system">System</string>
+    <string name="no_companies">No companies returned.</string>
+    <string name="company_switched">Company updated for this session.</string>
+    <string name="settings_about_body_detail">%1$s\n\nAPI: %2$s\n\nConnects to your ANDAI FastAPI backend. Chat and data depend on server models and configuration.</string>
+</resources>
