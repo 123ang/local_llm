@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
+import { BRAND_LOGO_SRC } from "@/components/BrandLogo";
 import {
   Brain, Database, FileText, MessageSquare, Shield, Building2,
   Lightbulb, Zap, ArrowRight, ChevronRight, Globe, Lock, BarChart3,
@@ -78,10 +79,14 @@ export default function LandingPage() {
       <nav className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/90 backdrop-blur-xl shadow-sm border-b border-slate-200/60" : "bg-transparent"}`}>
         <div className="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="bg-white rounded-lg p-1.5 shadow-sm border border-slate-200/60">
-              <Image src="/andai_logo_transparent.png" alt="ANDAI" width={32} height={32} className="h-8 w-8 object-contain" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">ANDAI</span>
+            <Image
+              src={BRAND_LOGO_SRC}
+              alt="ANDAI"
+              width={140}
+              height={47}
+              className="h-9 w-auto max-w-[160px] object-contain object-left"
+              priority
+            />
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-600">
             <a href="#features" className="hover:text-slate-900 transition-colors">Features</a>
@@ -111,8 +116,10 @@ export default function LandingPage() {
             </div>
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-[1.08] tracking-tight">
-              <span className="block">Adaptive Neural</span>
-              <span className="block bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 bg-clip-text text-transparent">Decision AI</span>
+              <span className="block text-slate-900">Answers from</span>
+              <span className="block bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 bg-clip-text text-transparent">
+                your company data
+              </span>
             </h1>
 
             <p className="mt-6 text-lg sm:text-xl text-slate-600 leading-relaxed max-w-2xl">
@@ -261,10 +268,13 @@ export default function LandingPage() {
       <footer className="border-t border-slate-200 py-8">
         <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-sm text-slate-500">
-            <div className="bg-white rounded-md p-1 border border-slate-200">
-              <Image src="/andai_logo_transparent.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
-            </div>
-            <span className="font-semibold text-slate-700">Adaptive Neural Decision AI</span>
+            <Image
+              src={BRAND_LOGO_SRC}
+              alt="ANDAI"
+              width={100}
+              height={33}
+              className="h-7 w-auto max-w-[120px] object-contain opacity-95"
+            />
             <span>· {new Date().getFullYear()}</span>
           </div>
           <p className="text-xs text-slate-400">Powered by local LLMs. Your data never leaves your server.</p>
