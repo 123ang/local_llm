@@ -163,6 +163,22 @@ export const api = {
   getAuditLogs: (companyId?: number, limit = 100, offset = 0) =>
     request<any[]>(`/audit?${companyId ? `company_id=${companyId}&` : ""}limit=${limit}&offset=${offset}`),
 
+  // Evaluations
+  getEvaluationQuestions: (companyId: number) => request<any[]>(`/evaluations/${companyId}/questions`),
+  createEvaluationQuestion: (companyId: number, data: any) =>
+    request<any>(`/evaluations/${companyId}/questions`, { method: "POST", body: JSON.stringify(data) }),
+  updateEvaluationQuestion: (companyId: number, questionId: number, data: any) =>
+    request<any>(`/evaluations/${companyId}/questions/${questionId}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteEvaluationQuestion: (companyId: number, questionId: number) =>
+    request<void>(`/evaluations/${companyId}/questions/${questionId}`, { method: "DELETE" }),
+  runEvaluationQuestion: (companyId: number, questionId: number) =>
+    request<any>(`/evaluations/${companyId}/questions/${questionId}/run`, { method: "POST" }),
+  getEvaluationRuns: (companyId: number, questionId?: number) =>
+    request<any[]>(`/evaluations/${companyId}/runs${questionId ? `?question_id=${questionId}` : ""}`),
+
+  // Analytics
+  getAnalyticsSummary: (companyId: number) => request<any>(`/analytics/${companyId}/summary`),
+
   // Generic request (for one-off calls)
   request: <T = any>(path: string, options?: RequestInit) => request<T>(path, options),
 };

@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, MessageSquare, FileText, HelpCircle,
-  Database, Building2, Users, ScrollText, LogOut,
+  Database, Building2, Users, ScrollText, LogOut, ClipboardCheck, BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -17,6 +17,8 @@ const adminNav = [
   { name: "Documents", href: "/dashboard/documents", icon: FileText },
   { name: "FAQ", href: "/dashboard/faq", icon: HelpCircle },
   { name: "Database", href: "/dashboard/database", icon: Database },
+  { name: "Evaluations", href: "/dashboard/evaluations", icon: ClipboardCheck },
+  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
 ];
 
 const platformNav = [

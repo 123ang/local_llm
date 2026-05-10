@@ -45,20 +45,20 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Phase 4 — Evaluation/Test Panel
 
-- [ ] Add saved test questions
-  - [ ] Question
-  - [ ] Expected answer/keywords
-  - [ ] Expected source
-  - [ ] Company/source scope
-- [ ] Add “Run test” button
-- [ ] Store results
-  - [ ] Pass/fail
-  - [ ] Answer
+- [x] Add saved test questions
+  - [x] Question
+  - [x] Expected answer/keywords
+  - [x] Expected source
+  - [x] Company/source scope
+- [x] Add “Run test” button
+- [x] Store results
+  - [x] Pass/fail
+  - [x] Answer
   - [x] Sources used
-  - [ ] Latency
-  - [ ] Model tier
-- [ ] Add regression test history
-- [ ] Add export test results
+  - [x] Latency
+  - [x] Model tier
+- [x] Add regression test history
+- [ ] Add export test results *(defer export polish)*
 
 ## Phase 5 — Reports & Exports
 
@@ -83,16 +83,16 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Phase 7 — Usage Analytics
 
-- [ ] Track questions asked
-- [ ] Track unanswered/refused questions
-- [ ] Track source type used
-- [ ] Track latency/model tier
-- [ ] Dashboard
-  - [ ] Most asked questions
-  - [ ] Most used documents/datasets
-  - [ ] Unanswered questions
-  - [ ] Active users
-  - [ ] Average response time
+- [x] Track questions asked
+- [x] Track unanswered/refused questions
+- [x] Track source type used
+- [x] Track latency/model tier
+- [x] Dashboard
+  - [x] Most asked questions
+  - [x] Most used documents/datasets
+  - [x] Unanswered questions
+  - [x] Active users
+  - [x] Average response time
 
 ## Before Coding Checklist
 
@@ -108,8 +108,8 @@ This checklist captures the next improvement phases before implementation. It in
 ## Post-Refresh Reminder
 
 - [ ] After token/context refresh, continue with Phase 4–7:
-  - [ ] Evaluation/Test Panel
+  - [x] Evaluation/Test Panel
   - [ ] Reports & PDF-first exports
   - [ ] Executive Answer UI
-  - [ ] Usage Analytics
+  - [x] Usage Analytics
 
