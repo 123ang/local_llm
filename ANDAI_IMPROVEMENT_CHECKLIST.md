@@ -96,6 +96,15 @@ This checklist captures the next improvement phases before implementation. It in
   - [x] Active users
   - [x] Average response time
 
+## Remaining To-Do / Polish Backlog
+
+- [ ] Group duplicate citations from the same PDF/page into one citation card
+- [ ] Add polished AI Insight badge when AI Insights contributes beyond strict source evidence
+- [ ] Add export for evaluation test results
+- [ ] Add board memo / executive briefing export
+- [ ] Add Word/Docx export
+- [ ] Add printed visual chart rendering in PDF exports
+
 ## Before Coding Checklist
 
 - [x] Decide default behavior: **Source Only by default**
