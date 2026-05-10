@@ -30,6 +30,8 @@ async def unified_query(
     enabled_sources: list[str] | None = None,
     ai_insights: bool = True,
     model_mode: str = "auto",
+    document_min_relevance: float = 0.60,
+    require_citations: bool = True,
 ) -> dict:
     """
     Search selected knowledge sources (FAQ, documents, structured data)
@@ -131,7 +133,7 @@ async def unified_query(
 
     # 4. Strict evidence mode: do not answer outside selected sources.
     if not ai_insights:
-        strict_evidence = _build_strict_evidence(faq_evidence, db_evidence, doc_evidence, sources)
+        strict_evidence = _build_strict_evidence(faq_evidence, db_evidence, doc_evidence, sources, document_min_relevance)
         if not strict_evidence:
             return {
                 "answer": _source_only_refusal(active),
@@ -254,6 +256,7 @@ def _build_strict_evidence(
     db_evidence: list[str],
     doc_evidence: list[str],
     sources: dict,
+    document_min_relevance: float = 0.60,
 ) -> list[str]:
     """Return evidence safe enough for Source-Only Mode."""
     evidence: list[str] = []
@@ -264,7 +267,7 @@ def _build_strict_evidence(
         score = chunk.get("score", 0)
         # Keyword fallback returns integer match counts; pgvector/JSON returns 0..1.
         is_strong_keyword = isinstance(score, int) and not isinstance(score, bool) and score >= 2
-        is_strong_vector = not isinstance(score, int) and float(score or 0) >= 0.6
+        is_strong_vector = not isinstance(score, int) and float(score or 0) >= document_min_relevance
         if is_strong_keyword or is_strong_vector:
             if i < len(doc_evidence):
                 evidence.append(doc_evidence[i])
@@ -366,6 +369,8 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
                 results.append({
                     "content": chunk.content[:600],
                     "source": doc.original_name,
+                    "document_id": doc.id,
+                    "company_id": doc.company_id,
                     "page": chunk.page_number,
                     "score": round(hit["score"], 3),
                 })
@@ -395,6 +400,8 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
                 results.append({
                     "content": chunk.content[:600],
                     "source": doc_name,
+                    "document_id": doc.id if doc else chunk.document_id,
+                    "company_id": doc.company_id if doc else chunk.company_id,
                     "page": chunk.page_number,
                     "score": round(score, 3),
                 })
@@ -434,6 +441,8 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
         results.append({
             "content": chunk.content[:600],
             "source": doc_name,
+            "document_id": doc.id if doc else chunk.document_id,
+            "company_id": doc.company_id if doc else chunk.company_id,
             "page": chunk.page_number,
             "score": score,
         })
@@ -460,6 +469,7 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
         )
 
     schema_text = "\n".join(schema_desc)
+    dataset_names_by_table = {ds.table_name: ds.display_name for ds in datasets}
 
     # Deterministic routing for cleaned Kedah Investment analytical views.
     # These questions are important demo questions and should not depend on fragile Text-to-SQL generation.
@@ -500,7 +510,8 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
                 rows = res.fetchmany(50)
                 columns = list(res.keys())
                 data = [dict(zip(columns, row)) for row in rows]
-                return {"sql": sql, "result": data, "row_count": len(data)}
+                table_refs = sorted(_extract_sql_table_refs(sql))
+                return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
         if wants_rm1b_jobs:
             sql = (
                 'SELECT total_employment, total_investment_rm_million, jobs_per_rm1b, first_year, latest_year, methodology_note '
@@ -511,7 +522,8 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
                 rows = res.fetchmany(50)
                 columns = list(res.keys())
                 data = [dict(zip(columns, row)) for row in rows]
-                return {"sql": sql, "result": data, "row_count": len(data)}
+                table_refs = sorted(_extract_sql_table_refs(sql))
+                return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
 
     # Optional hint for common UUM-style tables so the LLM maps questions to the right columns
     table_hint = ""
@@ -563,7 +575,8 @@ Return ONLY a SELECT query (double-quote identifiers, LIMIT 100) or NONE."""
                 rows = res.fetchmany(50)
                 columns = list(res.keys())
                 data = [dict(zip(columns, row)) for row in rows]
-                return {"sql": sql, "result": data, "row_count": len(data)}
+                table_refs = sorted(_extract_sql_table_refs(sql))
+                return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
         except Exception as e:
             logger.warning(f"SQL execution failed: {e} | SQL: {sql}")
             # Don't crash — return empty so the LLM can still answer from other sources

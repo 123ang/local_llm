@@ -1,6 +1,7 @@
 import os
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
@@ -122,3 +123,20 @@ async def delete_document(
         os.remove(doc.file_path)
     await db.delete(doc)
     await db.commit()
+
+
+@router.get("/{company_id}/{document_id}/file")
+async def view_document_file(
+    company_id: int,
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ensure_company_access(current_user, company_id)
+    result = await db.execute(
+        select(Document).where(Document.id == document_id, Document.company_id == company_id)
+    )
+    doc = result.scalar_one_or_none()
+    if not doc or not os.path.exists(doc.file_path):
+        raise HTTPException(status_code=404, detail="Document not found")
+    return FileResponse(doc.file_path, media_type=doc.mime_type or "application/pdf", filename=doc.original_name)

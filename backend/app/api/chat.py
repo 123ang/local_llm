@@ -9,6 +9,7 @@ from app.core.dependencies import ensure_company_access
 from app.schemas.chat import ChatRequest, ChatResponse, ChatSessionOut, ChatMessageOut
 from app.models.chat import ChatSession, ChatMessage
 from app.models.user import User
+from app.services.company_ai_settings_service import get_or_create_company_ai_settings, normalize_allowed_sources
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -32,6 +33,18 @@ def _compact_message(content: str, max_chars: int = 700) -> str:
     if len(content) <= max_chars:
         return content
     return content[:max_chars].rstrip() + "…"
+
+
+def _sanitize_sources_for_user(sources: dict | None, current_user: User) -> dict | None:
+    if not sources:
+        return sources
+    sanitized = dict(sources)
+    database = sanitized.get("database")
+    if isinstance(database, dict) and current_user.role not in {"admin", "super_admin"}:
+        database = dict(database)
+        database.pop("sql", None)
+        sanitized["database"] = database
+    return sanitized
 
 
 async def _build_contextual_question(db: AsyncSession, session_id: int, current_message: str) -> str:
@@ -124,17 +137,26 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
     try:
         from app.llm.unified_query import unified_query
         query_company_id = requested_company_id
+        ai_settings = await get_or_create_company_ai_settings(db, query_company_id)
+        enabled_sources = normalize_allowed_sources(data.sources, ai_settings.allowed_sources)
+        ai_insights = data.ai_insights
+        if ai_insights is None:
+            ai_insights = not ai_settings.default_source_only
+        if ai_insights and not ai_settings.ai_insights_allowed:
+            ai_insights = False
         contextual_question = await _build_contextual_question(db, session.id, data.message)
         result = await unified_query(
             question=contextual_question,
             company_id=query_company_id,
             db=db,
-            enabled_sources=data.sources,
-            ai_insights=data.ai_insights,
+            enabled_sources=enabled_sources,
+            ai_insights=ai_insights,
             model_mode=data.model_mode,
+            document_min_relevance=ai_settings.min_document_relevance,
+            require_citations=ai_settings.require_citations,
         )
         answer = result.get("answer", "I couldn't find an answer to that question.")
-        sources = result.get("sources")
+        sources = _sanitize_sources_for_user(result.get("sources"), current_user)
         model_tier = result.get("model_tier")
         sql_generated = None
     except Exception as e:

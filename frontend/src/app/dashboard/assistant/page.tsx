@@ -22,7 +22,7 @@ export default function AssistantPage() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [enabledSources, setEnabledSources] = useState<Set<string>>(new Set(["database", "documents", "faq"]));
-  const [aiInsights, setAiInsights] = useState(true);
+  const [aiInsights, setAiInsights] = useState(false);
   const [modelMode, setModelMode] = useState<"auto" | "instant" | "thinking">("auto");
   const messagesEnd = useRef<HTMLDivElement>(null);
 
@@ -131,7 +131,7 @@ export default function AssistantPage() {
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Bot size={48} className="mb-4 text-slate-300" />
               <p className="text-lg font-medium">How can I help you?</p>
-              <p className="text-sm mt-1">Ask about your documents, data, or FAQ</p>
+              <p className="text-sm mt-1">Ask about your documents, data, or FAQ. Source Only is the default.</p>
               <div className="mt-6 w-full max-w-xl">
                 <p className="text-xs font-medium text-slate-500 mb-2">Try asking:</p>
                 <div className="flex flex-wrap gap-2 justify-center">

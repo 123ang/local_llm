@@ -5,9 +5,10 @@ from app.models.faq import FAQItem
 from app.models.dataset import Dataset, DatasetImport
 from app.models.chat import ChatSession, ChatMessage
 from app.models.audit import AuditLog
+from app.models.company_ai_settings import CompanyAISettings
 
 __all__ = [
     "Company", "User", "Document", "DocumentChunk",
     "FAQItem", "Dataset", "DatasetImport",
-    "ChatSession", "ChatMessage", "AuditLog",
+    "ChatSession", "ChatMessage", "AuditLog", "CompanyAISettings",
 ]

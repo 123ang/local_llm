@@ -3,7 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import require_super_admin
 from app.schemas.company import CompanyCreate, CompanyUpdate, CompanyOut
+from app.schemas.company_ai_settings import CompanyAISettingsOut, CompanyAISettingsUpdate
 from app.services.company_service import create_company, get_companies, get_company, update_company
+from app.services.company_ai_settings_service import get_or_create_company_ai_settings
 from app.services.audit_service import log_action
 from app.models.user import User
 
@@ -34,3 +36,44 @@ async def update_existing_company(company_id: int, data: CompanyUpdate, current_
         raise HTTPException(status_code=404, detail="Company not found")
     await log_action(db, action="update_company", user_id=current_user.id, resource_type="company", resource_id=company.id, details=updates)
     return company
+
+
+@router.get("/{company_id}/ai-settings", response_model=CompanyAISettingsOut)
+async def get_company_ai_settings(
+    company_id: int,
+    current_user: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    company = await get_company(db, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return await get_or_create_company_ai_settings(db, company_id)
+
+
+@router.patch("/{company_id}/ai-settings", response_model=CompanyAISettingsOut)
+async def update_company_ai_settings(
+    company_id: int,
+    data: CompanyAISettingsUpdate,
+    current_user: User = Depends(require_super_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    company = await get_company(db, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    settings = await get_or_create_company_ai_settings(db, company_id)
+    updates = data.model_dump(exclude_unset=True)
+    for key, value in updates.items():
+        setattr(settings, key, value)
+    await db.commit()
+    await db.refresh(settings)
+    await log_action(
+        db,
+        action="update_company_ai_settings",
+        user_id=current_user.id,
+        company_id=company_id,
+        resource_type="company_ai_settings",
+        resource_id=settings.id,
+        details=updates,
+    )
+    return settings

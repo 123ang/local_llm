@@ -56,6 +56,9 @@ export const api = {
     request<any>("/companies", { method: "POST", body: JSON.stringify(data) }),
   updateCompany: (id: number, data: any) =>
     request<any>(`/companies/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  getCompanyAISettings: (id: number) => request<any>(`/companies/${id}/ai-settings`),
+  updateCompanyAISettings: (id: number, data: any) =>
+    request<any>(`/companies/${id}/ai-settings`, { method: "PATCH", body: JSON.stringify(data) }),
 
   // Users
   getUsers: (companyId?: number) =>
@@ -131,7 +134,7 @@ export const api = {
     sessionId?: number,
     companyId?: number,
     sources?: string[],
-    aiInsights = true,
+    aiInsights?: boolean,
     modelMode: "auto" | "instant" | "thinking" = "auto"
   ) => {
     const controller = new AbortController();

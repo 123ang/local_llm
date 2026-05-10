@@ -19,3 +19,4 @@ class Company(Base):
     faq_items = relationship("FAQItem", back_populates="company", cascade="all, delete-orphan")
     datasets = relationship("Dataset", back_populates="company", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="company", cascade="all, delete-orphan")
+    ai_settings = relationship("CompanyAISettings", back_populates="company", cascade="all, delete-orphan", uselist=False)

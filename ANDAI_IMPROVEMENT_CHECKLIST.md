@@ -4,44 +4,44 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Phase 1 — Trust & Anti-Hallucination
 
-- [ ] Add company-level knowledge settings
-  - [ ] Default mode: Source Only / AI Insights
-  - [ ] Allowed sources: Database, PDFs, FAQ
-  - [ ] Minimum document relevance threshold
-  - [ ] Require citation toggle
-- [ ] Add answer audit trail
-  - [ ] Sources used
-  - [ ] PDF/page references
-  - [ ] Database dataset/table used
-  - [ ] SQL query hidden behind expand button
-  - [ ] Retrieval scores hidden behind expand button
-- [ ] Improve refusal behavior
-  - [ ] Clear “not found in selected sources” message
-  - [ ] Suggest enabling AI Insights only if company allows it
-  - [ ] Suggest which source type to upload/query
+- [x] Add company-level knowledge settings
+  - [x] Default mode: Source Only / AI Insights
+  - [x] Allowed sources: Database, PDFs, FAQ
+  - [x] Minimum document relevance threshold
+  - [x] Require citation toggle
+- [x] Add answer audit trail
+  - [x] Sources used
+  - [x] PDF/page references
+  - [x] Database dataset/table used
+  - [x] SQL query hidden behind expand button
+  - [x] Retrieval scores hidden behind expand button
+- [x] Improve refusal behavior
+  - [x] Clear “not found in selected sources” message
+  - [x] Suggest enabling AI Insights only if company allows it
+  - [x] Suggest which source type to upload/query
 
 ## Phase 2 — Better Citations
 
-- [ ] Make PDF citations clickable
-  - [ ] Open document preview
-  - [ ] Jump to page if possible
-- [ ] Show quoted excerpt under citation
-- [ ] Show “Used X passages from Y document”
-- [ ] Group duplicate citations from same PDF/page
-- [ ] Add source badges
-  - [ ] PDF
-  - [ ] Database
-  - [ ] FAQ
-  - [ ] AI Insight
+- [x] Make PDF citations clickable
+  - [x] Open document preview
+  - [x] Jump to page if possible
+- [x] Show quoted excerpt under citation
+- [x] Show “Used X passages from Y document”
+- [ ] Group duplicate citations from same PDF/page *(defer polish)*
+- [x] Add source badges
+  - [x] PDF
+  - [x] Database
+  - [x] FAQ
+  - [ ] AI Insight *(defer until executive answer UI)*
 
 ## Phase 3 — Admin Knowledge Settings
 
-- [ ] Add backend model/table for company AI settings
-- [ ] Add API endpoints to read/update settings
-- [ ] Add frontend admin settings page/section
-- [ ] Enforce settings in `/chat`
-- [ ] Prevent normal company admins from changing unsafe/global settings if needed
-- [ ] Add audit log when settings are changed
+- [x] Add backend model/table for company AI settings
+- [x] Add API endpoints to read/update settings
+- [x] Add frontend admin settings page/section
+- [x] Enforce settings in `/chat`
+- [x] Prevent normal company admins from changing unsafe/global settings if needed
+- [x] Add audit log when settings are changed
 
 ## Phase 4 — Evaluation/Test Panel
 
@@ -54,7 +54,7 @@ This checklist captures the next improvement phases before implementation. It in
 - [ ] Store results
   - [ ] Pass/fail
   - [ ] Answer
-  - [ ] Sources used
+  - [x] Sources used
   - [ ] Latency
   - [ ] Model tier
 - [ ] Add regression test history
@@ -104,3 +104,12 @@ This checklist captures the next improvement phases before implementation. It in
 - [x] Decide export priority: **PDF first**
 - [x] Backup database before schema changes: `backups/askai_before_ai_settings_20260510_180242.dump`
 - [x] Commit current stable state before starting next phase: `a3df99e`
+
+## Post-Refresh Reminder
+
+- [ ] After token/context refresh, continue with Phase 4–7:
+  - [ ] Evaluation/Test Panel
+  - [ ] Reports & PDF-first exports
+  - [ ] Executive Answer UI
+  - [ ] Usage Analytics
+

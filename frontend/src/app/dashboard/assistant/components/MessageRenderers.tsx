@@ -1,4 +1,4 @@
-import { Database, FileText, HelpCircle } from "lucide-react";
+import { Database, FileText, HelpCircle, ShieldCheck } from "lucide-react";
 
 export function MessageContent({ content }: { content: string }) {
   const lines = content.split("\n");
@@ -127,30 +127,102 @@ export function DatabaseResultTable({ data }: { data: any }) {
   );
 }
 
+async function openPdfSource(doc: any) {
+  if (!doc.company_id || !doc.document_id) return;
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const res = await fetch(`/api/documents/${doc.company_id}/${doc.document_id}/file`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(`${url}${doc.page ? `#page=${doc.page}` : ""}`, "_blank", "noopener,noreferrer");
+}
+
 export function SourceBadges({ sources }: { sources: any }) {
   if (!sources) return null;
-  const hasFaq = sources.faq?.length > 0;
-  const hasDocs = sources.documents?.length > 0;
-  const hasDb = sources.database;
+  const docs = sources.documents || [];
+  const faq = sources.faq || [];
+  const db = sources.database;
+  const hasFaq = faq.length > 0;
+  const hasDocs = docs.length > 0;
+  const hasDb = !!db;
   if (!hasFaq && !hasDocs && !hasDb) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {hasFaq && (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200">
-          <HelpCircle size={11} /> {sources.faq.length} FAQ
-        </span>
-      )}
-      {hasDocs && sources.documents.map((doc: any, i: number) => (
-        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
-          <FileText size={11} /> {doc.source}{doc.page ? `, p.${doc.page}` : ""}
-        </span>
-      ))}
-      {hasDb && (
-        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200">
-          <Database size={11} /> {hasDb.row_count ?? 0} rows from database
-        </span>
-      )}
+    <div className="mt-3 space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {hasFaq && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200">
+            <HelpCircle size={11} /> {faq.length} FAQ
+          </span>
+        )}
+        {hasDocs && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
+            <FileText size={11} /> {docs.length} PDF passage{docs.length === 1 ? "" : "s"}
+          </span>
+        )}
+        {hasDb && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200">
+            <Database size={11} /> {db.row_count ?? 0} database row{db.row_count === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+
+      <details className="group rounded-lg border border-slate-200 bg-white">
+        <summary className="cursor-pointer select-none list-none px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck size={12} className="text-slate-500" /> Answer audit trail
+          </span>
+          <span className="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
+        </summary>
+        <div className="border-t border-slate-200 p-3 space-y-3 text-xs text-slate-600">
+          {hasDocs && (
+            <div>
+              <div className="font-semibold text-slate-700 mb-1">Documents</div>
+              <div className="space-y-2">
+                {docs.map((doc: any, i: number) => (
+                  <div key={i} className="rounded-md bg-blue-50 border border-blue-100 p-2">
+                    <button type="button" onClick={() => openPdfSource(doc)} className="font-medium text-blue-700 hover:underline text-left">
+                      Source: {doc.source}{doc.page ? `, page ${doc.page}` : ""}
+                    </button>
+                    {doc.score !== undefined && <div className="text-blue-600/70 mt-0.5">Relevance: {doc.score}</div>}
+                    {doc.content && <div className="mt-1 text-slate-600 line-clamp-3">“{doc.content}”</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {hasDb && (
+            <div>
+              <div className="font-semibold text-slate-700 mb-1">Database</div>
+              <div className="rounded-md bg-emerald-50 border border-emerald-100 p-2">
+                <div>Source: {(db.datasets || db.tables || ["Database"]).join(", ")}</div>
+                <div>Rows returned: {db.row_count ?? 0}</div>
+                {db.sql && (
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-emerald-700 font-medium">Show SQL</summary>
+                    <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px] text-slate-600 border border-emerald-100">{db.sql}</pre>
+                  </details>
+                )}
+              </div>
+            </div>
+          )}
+          {hasFaq && (
+            <div>
+              <div className="font-semibold text-slate-700 mb-1">FAQ</div>
+              <div className="space-y-2">
+                {faq.map((item: any, i: number) => (
+                  <div key={i} className="rounded-md bg-amber-50 border border-amber-100 p-2">
+                    <div className="font-medium text-amber-700">{item.question}</div>
+                    <div className="mt-1 text-slate-600 line-clamp-2">{item.answer}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
