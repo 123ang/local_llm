@@ -96,11 +96,11 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Before Coding Checklist
 
-- [ ] Decide default behavior: Source Only by default or AI Insights by default
-- [ ] Decide who can change AI settings: super admin only or company admin too
-- [ ] Decide whether SQL should be visible to admins only
+- [x] Decide default behavior: **Source Only by default**
+- [x] Decide who can change AI settings: **super admin only**
+- [x] Decide whether SQL should be visible to admins only: **yes, admins only**
 - [ ] Decide citation format
-- [ ] Decide if PDF preview/page jump is required now or later
-- [ ] Decide export priority: PDF first or Word first
-- [ ] Backup database before schema changes
+- [x] Decide if PDF preview/page jump is required now or later: **required now**
+- [x] Decide export priority: **PDF first**
+- [x] Backup database before schema changes: `backups/askai_before_ai_settings_20260510_180242.dump`
 - [ ] Commit current stable state before starting next phase

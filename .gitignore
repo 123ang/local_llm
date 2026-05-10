@@ -40,3 +40,6 @@ logs/
 # Temp
 setup_db.py
 
+
+# Local database backups
+backups/*.dump
