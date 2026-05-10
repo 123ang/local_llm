@@ -62,12 +62,13 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Phase 5 — Reports & Exports
 
-- [ ] Generate PDF/document summary
+- [x] Generate PDF/document summary *(single-answer printable evidence report)*
 - [ ] Generate board memo / briefing
-- [ ] Export answer as PDF
+- [x] Export answer as PDF
 - [ ] Export answer as Word/Docx
-- [ ] Include citations in exports
-- [ ] Include generated charts/tables in exports
+- [x] Include citations in exports
+- [x] Include generated tables in exports
+- [ ] Include generated charts in exports *(defer visual chart print rendering)*
 
 ## Phase 6 — Executive Answer UI
 
@@ -80,7 +81,7 @@ This checklist captures the next improvement phases before implementation. It in
 - [x] Add chart rendering for numeric database results
 - [x] Add collapsible raw data section
 - [x] Add copy button
-- [ ] Add export button *(defer to Phase 5 PDF export)*
+- [x] Add PDF export button
 
 ## Phase 7 — Usage Analytics
 
@@ -110,7 +111,7 @@ This checklist captures the next improvement phases before implementation. It in
 
 - [ ] After token/context refresh, continue with Phase 4–7:
   - [x] Evaluation/Test Panel
-  - [ ] Reports & PDF-first exports
+  - [x] Reports & PDF-first exports *(basic answer PDF export complete; board memo/Word still deferred)*
   - [x] Executive Answer UI
   - [x] Usage Analytics
 

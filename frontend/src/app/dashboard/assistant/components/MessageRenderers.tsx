@@ -1,4 +1,4 @@
-import { BarChart3, Copy, Database, FileText, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
+import { BarChart3, Copy, Database, Download, FileText, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
 
 export function MessageContent({ content }: { content: string }) {
   const lines = content.split("\n");
@@ -227,6 +227,74 @@ export function SourceBadges({ sources }: { sources: any }) {
   );
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function markdownToPrintableHtml(content: string): string {
+  const lines = content.split("\n");
+  const html: string[] = [];
+  let i = 0;
+  const isTableSeparator = (line: string) => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+  const isTableRow = (line: string) => line.trim().startsWith("|") && line.trim().endsWith("|");
+  const splitCells = (line: string) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(cell => cell.trim());
+  const inline = (text: string) => escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+  while (i < lines.length) {
+    if (isTableRow(lines[i]) && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      const headers = splitCells(lines[i]);
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && isTableRow(lines[i])) {
+        rows.push(splitCells(lines[i]));
+        i += 1;
+      }
+      html.push(`<table><thead><tr>${headers.map(h => `<th>${inline(h)}</th>`).join("")}</tr></thead><tbody>${rows.map(row => `<tr>${headers.map((_, idx) => `<td>${inline(row[idx] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
+    const paragraph: string[] = [];
+    while (i < lines.length && !(isTableRow(lines[i]) && i + 1 < lines.length && isTableSeparator(lines[i + 1]))) {
+      if (lines[i].trim()) paragraph.push(lines[i]);
+      i += 1;
+    }
+    if (paragraph.length) html.push(`<p>${inline(paragraph.join("\n")).replace(/\n/g, "<br/>")}</p>`);
+  }
+  return html.join("\n");
+}
+
+function buildSourcesHtml(sources: any): string {
+  const docs = sources?.documents || [];
+  const faq = sources?.faq || [];
+  const db = sources?.database;
+  const parts: string[] = [];
+  if (docs.length) {
+    parts.push(`<h2>Document sources</h2>${docs.map((doc: any) => `<div class="source"><strong>Source:</strong> ${escapeHtml(doc.source)}${doc.page ? `, page ${escapeHtml(doc.page)}` : ""}${doc.score !== undefined ? `<br/><strong>Relevance:</strong> ${escapeHtml(doc.score)}` : ""}${doc.content ? `<blockquote>${escapeHtml(doc.content)}</blockquote>` : ""}</div>`).join("")}`);
+  }
+  if (db) {
+    const source = (db.datasets || db.tables || ["Database"]).join(", ");
+    parts.push(`<h2>Database source</h2><div class="source"><strong>Source:</strong> ${escapeHtml(source)}<br/><strong>Rows returned:</strong> ${escapeHtml(db.row_count ?? 0)}${db.sql ? `<details><summary>SQL</summary><pre>${escapeHtml(db.sql)}</pre></details>` : ""}</div>`);
+  }
+  if (faq.length) {
+    parts.push(`<h2>FAQ sources</h2>${faq.map((item: any) => `<div class="source"><strong>${escapeHtml(item.question)}</strong><br/>${escapeHtml(item.answer)}</div>`).join("")}`);
+  }
+  return parts.join("\n") || "<p>No source evidence attached.</p>";
+}
+
+function exportAnswerPdf(content: string, sources: any) {
+  const printable = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+  if (!printable) return;
+  const title = extractKeyAnswer(content);
+  printable.document.write(`<!doctype html><html><head><title>ANDAI Answer Export</title><style>
+    body{font-family:Inter,Arial,sans-serif;color:#0f172a;margin:32px;line-height:1.55}.meta{color:#64748b;font-size:12px;margin-bottom:20px}.badge{display:inline-block;border:1px solid #a7f3d0;background:#ecfdf5;color:#047857;border-radius:999px;padding:3px 8px;font-size:12px}h1{font-size:24px;margin:0 0 8px}h2{font-size:15px;margin:24px 0 8px;color:#334155}p{white-space:normal}table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#f1f5f9}.source{border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px;margin:8px 0;font-size:12px}blockquote{border-left:3px solid #94a3b8;margin:8px 0 0;padding-left:10px;color:#475569}pre{white-space:pre-wrap;background:#fff;border:1px solid #e2e8f0;padding:8px;border-radius:8px}@media print{button{display:none}body{margin:18mm}}
+  </style></head><body><button onclick="window.print()" style="float:right;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white">Print / Save PDF</button><div class="badge">ANDAI evidence report</div><h1>${escapeHtml(title)}</h1><div class="meta">Generated ${escapeHtml(new Date().toLocaleString())} · ${escapeHtml(sourceSummary(sources))}</div><h2>Answer</h2>${markdownToPrintableHtml(content)}<h2>Sources and citations</h2>${buildSourcesHtml(sources)}<script>setTimeout(()=>window.print(),300)</script></body></html>`);
+  printable.document.close();
+}
+
 function extractKeyAnswer(content: string): string {
   const lines = content.split("\n").map(line => line.trim()).filter(Boolean);
   const firstText = lines.find(line => !line.startsWith("|") && !/^:?-{3,}/.test(line));
@@ -309,14 +377,24 @@ export function ExecutiveAnswerCard({ content, sources }: { content: string; sou
             <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Executive answer</div>
             <div className="mt-1 text-sm font-semibold text-slate-900">{extractKeyAnswer(content)}</div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigator.clipboard?.writeText(content)}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-50"
-            title="Copy answer"
-          >
-            <Copy size={12} /> Copy
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => navigator.clipboard?.writeText(content)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-50"
+              title="Copy answer"
+            >
+              <Copy size={12} /> Copy
+            </button>
+            <button
+              type="button"
+              onClick={() => exportAnswerPdf(content, sources)}
+              className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
+              title="Export answer as PDF"
+            >
+              <Download size={12} /> PDF
+            </button>
+          </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
           <span className={`rounded-full px-2 py-0.5 ${hasSources ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
