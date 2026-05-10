@@ -99,7 +99,7 @@ This checklist captures the next improvement phases before implementation. It in
 - [x] Decide default behavior: **Source Only by default**
 - [x] Decide who can change AI settings: **super admin only**
 - [x] Decide whether SQL should be visible to admins only: **yes, admins only**
-- [ ] Decide citation format
+- [x] Decide citation format: **Documents:** `Source: <PDF name>, page <page> — quoted excerpt`; **Database:** `Source: <dataset/table name>`
 - [x] Decide if PDF preview/page jump is required now or later: **required now**
 - [x] Decide export priority: **PDF first**
 - [x] Backup database before schema changes: `backups/askai_before_ai_settings_20260510_180242.dump`
