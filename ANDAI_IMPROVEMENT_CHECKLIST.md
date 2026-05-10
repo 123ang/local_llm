@@ -103,4 +103,4 @@ This checklist captures the next improvement phases before implementation. It in
 - [x] Decide if PDF preview/page jump is required now or later: **required now**
 - [x] Decide export priority: **PDF first**
 - [x] Backup database before schema changes: `backups/askai_before_ai_settings_20260510_180242.dump`
-- [ ] Commit current stable state before starting next phase
+- [x] Commit current stable state before starting next phase: `a3df99e`
