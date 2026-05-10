@@ -27,12 +27,12 @@ This checklist captures the next improvement phases before implementation. It in
   - [x] Jump to page if possible
 - [x] Show quoted excerpt under citation
 - [x] Show “Used X passages from Y document”
-- [ ] Group duplicate citations from same PDF/page *(defer polish)*
+- [x] Group duplicate citations from same PDF/page
 - [x] Add source badges
   - [x] PDF
   - [x] Database
   - [x] FAQ
-  - [ ] AI Insight *(defer until executive answer UI)*
+  - [x] AI Insight
 
 ## Phase 3 — Admin Knowledge Settings
 
@@ -58,17 +58,17 @@ This checklist captures the next improvement phases before implementation. It in
   - [x] Latency
   - [x] Model tier
 - [x] Add regression test history
-- [ ] Add export test results *(defer export polish)*
+- [x] Add export test results
 
 ## Phase 5 — Reports & Exports
 
 - [x] Generate PDF/document summary *(single-answer printable evidence report)*
-- [ ] Generate board memo / briefing
+- [x] Generate board memo / briefing
 - [x] Export answer as PDF
-- [ ] Export answer as Word/Docx
+- [x] Export answer as Word/Docx
 - [x] Include citations in exports
 - [x] Include generated tables in exports
-- [ ] Include generated charts in exports *(defer visual chart print rendering)*
+- [x] Include generated charts in exports
 
 ## Phase 6 — Executive Answer UI
 
@@ -98,12 +98,12 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Remaining To-Do / Polish Backlog
 
-- [ ] Group duplicate citations from the same PDF/page into one citation card
-- [ ] Add polished AI Insight badge when AI Insights contributes beyond strict source evidence
-- [ ] Add export for evaluation test results
-- [ ] Add board memo / executive briefing export
-- [ ] Add Word/Docx export
-- [ ] Add printed visual chart rendering in PDF exports
+- [x] Group duplicate citations from the same PDF/page into one citation card
+- [x] Add polished AI Insight badge when AI Insights contributes beyond strict source evidence
+- [x] Add export for evaluation test results
+- [x] Add board memo / executive briefing export
+- [x] Add Word/Docx export
+- [x] Add printed visual chart rendering in PDF exports
 
 ## Before Coding Checklist
 
@@ -118,9 +118,8 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Post-Refresh Reminder
 
-- [ ] After token/context refresh, continue with Phase 4–7:
+- [x] After token/context refresh, continue with Phase 4–7:
   - [x] Evaluation/Test Panel
-  - [x] Reports & PDF-first exports *(basic answer PDF export complete; board memo/Word still deferred)*
+  - [x] Reports & PDF-first exports
   - [x] Executive Answer UI
   - [x] Usage Analytics
-

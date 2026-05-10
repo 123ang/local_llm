@@ -1,10 +1,27 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Play, Plus, Trash2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Download, FileJson, Play, Plus, Trash2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
 
 const SOURCE_OPTIONS = ["database", "documents", "faq"];
+
+function csvCell(value: unknown): string {
+  const text = Array.isArray(value) || (value && typeof value === "object") ? JSON.stringify(value) : String(value ?? "");
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function downloadTextFile(filename: string, mimeType: string, content: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 export default function EvaluationsPage() {
   const companyId = useCompanyId();
@@ -73,12 +90,50 @@ export default function EvaluationsPage() {
 
   const latestRun = (questionId: number) => runs.find(r => r.question_id === questionId);
   const passCount = runs.filter(r => r.passed).length;
+  const exportRows = () => runs.map(run => {
+    const question = questions.find(q => q.id === run.question_id);
+    return {
+      run_id: run.id,
+      question_id: run.question_id,
+      question: question?.question ?? "",
+      passed: run.passed,
+      latency_ms: run.latency_ms ?? "",
+      model_tier: run.model_tier ?? "",
+      missing_keywords: run.missing_keywords || [],
+      expected_keywords: question?.expected_keywords || [],
+      expected_source: question?.expected_source ?? "",
+      answer: run.answer,
+      sources_used: run.sources_used,
+      created_at: run.created_at,
+    };
+  });
+  const exportCsv = () => {
+    const rows = exportRows();
+    const headers = ["run_id", "question_id", "question", "passed", "latency_ms", "model_tier", "missing_keywords", "expected_keywords", "expected_source", "answer", "sources_used", "created_at"];
+    const csv = [headers.join(","), ...rows.map(row => headers.map(header => csvCell(row[header as keyof typeof row])).join(","))].join("\n");
+    downloadTextFile("andai-evaluation-results.csv", "text/csv;charset=utf-8", csv);
+  };
+  const exportJson = () => {
+    downloadTextFile("andai-evaluation-results.json", "application/json;charset=utf-8", JSON.stringify(exportRows(), null, 2));
+  };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Evaluation Tests</h1>
-        <p className="text-slate-500 mt-1">Save regression questions and verify answers, sources, latency, and model tier.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Evaluation Tests</h1>
+            <p className="text-slate-500 mt-1">Save regression questions and verify answers, sources, latency, and model tier.</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button onClick={exportCsv} disabled={!runs.length} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+              <Download size={15} /> CSV
+            </button>
+            <button onClick={exportJson} disabled={!runs.length} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+              <FileJson size={15} /> JSON
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-4 gap-4">

@@ -1,4 +1,4 @@
-import { BarChart3, Copy, Database, Download, FileText, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Copy, Database, Download, FileText, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
 
 export function MessageContent({ content }: { content: string }) {
   const lines = content.split("\n");
@@ -139,9 +139,28 @@ async function openPdfSource(doc: any) {
   window.open(`${url}${doc.page ? `#page=${doc.page}` : ""}`, "_blank", "noopener,noreferrer");
 }
 
+function groupDocumentCitations(docs: any[]): any[] {
+  const grouped = new Map<string, any>();
+  for (const doc of docs) {
+    const key = `${doc.document_id ?? doc.source}|${doc.page ?? "unknown"}`;
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...doc, passages: [doc.content].filter(Boolean), passage_count: 1 });
+      continue;
+    }
+    existing.passage_count += 1;
+    if (doc.content && !existing.passages.includes(doc.content)) existing.passages.push(doc.content);
+    if (doc.score !== undefined && (existing.score === undefined || Number(doc.score) > Number(existing.score))) {
+      existing.score = doc.score;
+    }
+  }
+  return Array.from(grouped.values());
+}
+
 export function SourceBadges({ sources }: { sources: any }) {
   if (!sources) return null;
   const docs = sources.documents || [];
+  const groupedDocs = groupDocumentCitations(docs);
   const faq = sources.faq || [];
   const db = sources.database;
   const hasFaq = faq.length > 0;
@@ -159,7 +178,7 @@ export function SourceBadges({ sources }: { sources: any }) {
         )}
         {hasDocs && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
-            <FileText size={11} /> {docs.length} PDF passage{docs.length === 1 ? "" : "s"}
+            <FileText size={11} /> {docs.length} PDF passage{docs.length === 1 ? "" : "s"} on {groupedDocs.length} page{groupedDocs.length === 1 ? "" : "s"}
           </span>
         )}
         {hasDb && (
@@ -181,13 +200,16 @@ export function SourceBadges({ sources }: { sources: any }) {
             <div>
               <div className="font-semibold text-slate-700 mb-1">Documents</div>
               <div className="space-y-2">
-                {docs.map((doc: any, i: number) => (
+                {groupedDocs.map((doc: any, i: number) => (
                   <div key={i} className="rounded-md bg-blue-50 border border-blue-100 p-2">
                     <button type="button" onClick={() => openPdfSource(doc)} className="font-medium text-blue-700 hover:underline text-left">
                       Source: {doc.source}{doc.page ? `, page ${doc.page}` : ""}
                     </button>
+                    <div className="text-blue-600/70 mt-0.5">Used {doc.passage_count} passage{doc.passage_count === 1 ? "" : "s"} from this page</div>
                     {doc.score !== undefined && <div className="text-blue-600/70 mt-0.5">Relevance: {doc.score}</div>}
-                    {doc.content && <div className="mt-1 text-slate-600 line-clamp-3">“{doc.content}”</div>}
+                    {doc.passages?.slice(0, 2).map((passage: string, idx: number) => (
+                      <div key={idx} className="mt-1 text-slate-600 line-clamp-3">"{passage}"</div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -268,12 +290,12 @@ function markdownToPrintableHtml(content: string): string {
 }
 
 function buildSourcesHtml(sources: any): string {
-  const docs = sources?.documents || [];
+  const docs = groupDocumentCitations(sources?.documents || []);
   const faq = sources?.faq || [];
   const db = sources?.database;
   const parts: string[] = [];
   if (docs.length) {
-    parts.push(`<h2>Document sources</h2>${docs.map((doc: any) => `<div class="source"><strong>Source:</strong> ${escapeHtml(doc.source)}${doc.page ? `, page ${escapeHtml(doc.page)}` : ""}${doc.score !== undefined ? `<br/><strong>Relevance:</strong> ${escapeHtml(doc.score)}` : ""}${doc.content ? `<blockquote>${escapeHtml(doc.content)}</blockquote>` : ""}</div>`).join("")}`);
+    parts.push(`<h2>Document sources</h2>${docs.map((doc: any) => `<div class="source"><strong>Source:</strong> ${escapeHtml(doc.source)}${doc.page ? `, page ${escapeHtml(doc.page)}` : ""}<br/><strong>Passages used:</strong> ${escapeHtml(doc.passage_count)}${doc.score !== undefined ? `<br/><strong>Best relevance:</strong> ${escapeHtml(doc.score)}` : ""}${(doc.passages || []).slice(0, 3).map((passage: string) => `<blockquote>${escapeHtml(passage)}</blockquote>`).join("")}</div>`).join("")}`);
   }
   if (db) {
     const source = (db.datasets || db.tables || ["Database"]).join(", ");
@@ -285,14 +307,230 @@ function buildSourcesHtml(sources: any): string {
   return parts.join("\n") || "<p>No source evidence attached.</p>";
 }
 
+function buildChartRows(data: any) {
+  const rows = Array.isArray(data?.result) ? data.result : [];
+  if (!rows.length) return null;
+
+  const cols = Object.keys(rows[0] || {});
+  const numericCols = cols.filter(col => rows.some((row: any) => Number.isFinite(Number(row[col]))));
+  const labelCol = cols.find(col => !numericCols.includes(col) && rows.some((row: any) => row[col])) || cols[0];
+  const valueCol = numericCols.find(col => /score|rate|ratio|jobs|count|total|amount|value|percentage|percent/i.test(col)) || numericCols[0];
+  if (!labelCol || !valueCol) return null;
+
+  const chartRows: Array<{ label: string; value: number }> = rows
+    .map((row: any) => ({ label: String(row[labelCol] ?? "-"), value: Number(row[valueCol]) }))
+    .filter((row: any) => Number.isFinite(row.value))
+    .slice(0, 8);
+  if (chartRows.length < 2) return null;
+  return { labelCol, valueCol, chartRows };
+}
+
+function buildChartHtml(data: any): string {
+  const chart = buildChartRows(data);
+  if (!chart) return "";
+  const max = Math.max(...chart.chartRows.map((row: { label: string; value: number }) => Math.abs(row.value)), 1);
+  const width = 720;
+  const rowHeight = 34;
+  const labelWidth = 210;
+  const barWidth = 390;
+  const height = 42 + chart.chartRows.length * rowHeight;
+  const rows = chart.chartRows.map((row: { label: string; value: number }, idx: number) => {
+    const y = 34 + idx * rowHeight;
+    const w = Math.max(8, Math.round(Math.abs(row.value) / max * barWidth));
+    return `<text x="0" y="${y + 13}" font-size="11" fill="#475569">${escapeHtml(row.label).slice(0, 34)}</text><rect x="${labelWidth}" y="${y}" width="${barWidth}" height="12" rx="6" fill="#f1f5f9"/><rect x="${labelWidth}" y="${y}" width="${w}" height="12" rx="6" fill="#ef4444"/><text x="${labelWidth + barWidth + 16}" y="${y + 11}" font-size="11" fill="#334155">${escapeHtml(row.value.toLocaleString(undefined, { maximumFractionDigits: 2 }))}</text>`;
+  }).join("");
+  return `<h2>Visual chart</h2><div class="chart"><svg viewBox="0 0 ${width} ${height}" width="100%" role="img" aria-label="Chart for ${escapeHtml(chart.valueCol)}"><text x="0" y="14" font-size="13" font-weight="700" fill="#334155">Quick chart: ${escapeHtml(chart.valueCol)}</text>${rows}</svg></div>`;
+}
+
+function downloadTextFile(filename: string, mimeType: string, content: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function escapeXml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function crc32(bytes: Uint8Array): number {
+  let crc = -1;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let i = 0; i < 8; i += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ -1) >>> 0;
+}
+
+function writeUint16(out: number[], value: number) {
+  out.push(value & 255, (value >>> 8) & 255);
+}
+
+function writeUint32(out: number[], value: number) {
+  out.push(value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255);
+}
+
+function zipStored(files: Array<{ name: string; content: string }>): Blob {
+  const encoder = new TextEncoder();
+  const out: number[] = [];
+  const central: number[] = [];
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+
+  for (const file of files) {
+    const name = encoder.encode(file.name);
+    const bytes = encoder.encode(file.content);
+    const crc = crc32(bytes);
+    const offset = out.length;
+
+    writeUint32(out, 0x04034b50);
+    writeUint16(out, 20);
+    writeUint16(out, 0);
+    writeUint16(out, 0);
+    writeUint16(out, dosTime);
+    writeUint16(out, dosDate);
+    writeUint32(out, crc);
+    writeUint32(out, bytes.length);
+    writeUint32(out, bytes.length);
+    writeUint16(out, name.length);
+    writeUint16(out, 0);
+    out.push(...name, ...bytes);
+
+    writeUint32(central, 0x02014b50);
+    writeUint16(central, 20);
+    writeUint16(central, 20);
+    writeUint16(central, 0);
+    writeUint16(central, 0);
+    writeUint16(central, dosTime);
+    writeUint16(central, dosDate);
+    writeUint32(central, crc);
+    writeUint32(central, bytes.length);
+    writeUint32(central, bytes.length);
+    writeUint16(central, name.length);
+    writeUint16(central, 0);
+    writeUint16(central, 0);
+    writeUint16(central, 0);
+    writeUint16(central, 0);
+    writeUint32(central, 0);
+    writeUint32(central, offset);
+    central.push(...name);
+  }
+
+  const centralOffset = out.length;
+  out.push(...central);
+  writeUint32(out, 0x06054b50);
+  writeUint16(out, 0);
+  writeUint16(out, 0);
+  writeUint16(out, files.length);
+  writeUint16(out, files.length);
+  writeUint32(out, central.length);
+  writeUint32(out, centralOffset);
+  writeUint16(out, 0);
+
+  return new Blob([new Uint8Array(out)], {
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  });
+}
+
+function docxParagraph(text: string, style?: "Title" | "Heading1") {
+  const styleXml = style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : "";
+  return `<w:p>${styleXml}<w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`;
+}
+
+function buildDocxContent(content: string, sources: any): Blob {
+  const paragraphs: string[] = [];
+  paragraphs.push(docxParagraph(extractKeyAnswer(content), "Title"));
+  paragraphs.push(docxParagraph(`Generated ${new Date().toLocaleString()} - ${sourceSummary(sources)}`));
+  if (hasAiInsightContribution(content, sources)) paragraphs.push(docxParagraph("AI Insight contributed beyond strict source evidence."));
+  paragraphs.push(docxParagraph("Answer", "Heading1"));
+  for (const line of content.split("\n").map(item => item.trim()).filter(Boolean)) {
+    if (!/^\|?\s*:?-{3,}/.test(line)) paragraphs.push(docxParagraph(line.replace(/\*\*/g, "")));
+  }
+
+  const chart = buildChartRows(sources?.database);
+  if (chart) {
+    paragraphs.push(docxParagraph("Visual chart", "Heading1"));
+    paragraphs.push(...chart.chartRows.map(row => docxParagraph(`${row.label}: ${row.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`)));
+  }
+
+  paragraphs.push(docxParagraph("Sources and citations", "Heading1"));
+  for (const doc of groupDocumentCitations(sources?.documents || [])) {
+    paragraphs.push(docxParagraph(`Source: ${doc.source}${doc.page ? `, page ${doc.page}` : ""} - ${doc.passage_count} passage${doc.passage_count === 1 ? "" : "s"}`));
+    for (const passage of (doc.passages || []).slice(0, 3)) paragraphs.push(docxParagraph(`Quote: ${passage}`));
+  }
+  const db = sources?.database;
+  if (db) {
+    paragraphs.push(docxParagraph(`Database source: ${(db.datasets || db.tables || ["Database"]).join(", ")}`));
+    paragraphs.push(docxParagraph(`Rows returned: ${db.row_count ?? 0}`));
+  }
+  for (const item of sources?.faq || []) {
+    paragraphs.push(docxParagraph(`FAQ: ${item.question}`));
+    paragraphs.push(docxParagraph(item.answer));
+  }
+
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraphs.join("")}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`;
+  return zipStored([
+    { name: "[Content_Types].xml", content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>` },
+    { name: "_rels/.rels", content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>` },
+    { name: "word/document.xml", content: documentXml },
+  ]);
+}
+
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function buildExportHtml(content: string, sources: any, options?: { memo?: boolean }) {
+  const title = extractKeyAnswer(content);
+  const generated = new Date().toLocaleString();
+  const chartHtml = buildChartHtml(sources?.database);
+  const aiBadge = hasAiInsightContribution(content, sources)
+    ? `<span class="badge ai">AI Insight contributed</span>`
+    : "";
+  const memoIntro = options?.memo
+    ? `<h2>Executive briefing</h2><p>This briefing summarizes the answer, available evidence, and recommended action for board or leadership review.</p>`
+    : "";
+  return `<!doctype html><html><head><meta charset="utf-8"/><title>${escapeHtml(options?.memo ? "ANDAI Executive Briefing" : "ANDAI Answer Export")}</title><style>
+    body{font-family:Inter,Arial,sans-serif;color:#0f172a;margin:32px;line-height:1.55}.meta{color:#64748b;font-size:12px;margin-bottom:20px}.badge{display:inline-block;border:1px solid #a7f3d0;background:#ecfdf5;color:#047857;border-radius:999px;padding:3px 8px;font-size:12px;margin-right:6px}.badge.ai{border-color:#d8b4fe;background:#faf5ff;color:#7e22ce}h1{font-size:24px;margin:8px 0}h2{font-size:15px;margin:24px 0 8px;color:#334155}p{white-space:normal}table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#f1f5f9}.source,.chart{border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px;margin:8px 0;font-size:12px}blockquote{border-left:3px solid #94a3b8;margin:8px 0 0;padding-left:10px;color:#475569}pre{white-space:pre-wrap;background:#fff;border:1px solid #e2e8f0;padding:8px;border-radius:8px}@media print{button{display:none}body{margin:18mm}.source,.chart{break-inside:avoid}}
+  </style></head><body><button onclick="window.print()" style="float:right;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white">Print / Save PDF</button><div><span class="badge">${escapeHtml(options?.memo ? "ANDAI executive briefing" : "ANDAI evidence report")}</span>${aiBadge}</div><h1>${escapeHtml(title)}</h1><div class="meta">Generated ${escapeHtml(generated)} · ${escapeHtml(sourceSummary(sources))}</div>${memoIntro}<h2>Answer</h2>${markdownToPrintableHtml(content)}${chartHtml}<h2>Sources and citations</h2>${buildSourcesHtml(sources)}<script>setTimeout(()=>window.print(),300)</script></body></html>`;
+}
+
 function exportAnswerPdf(content: string, sources: any) {
   const printable = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
   if (!printable) return;
-  const title = extractKeyAnswer(content);
-  printable.document.write(`<!doctype html><html><head><title>ANDAI Answer Export</title><style>
-    body{font-family:Inter,Arial,sans-serif;color:#0f172a;margin:32px;line-height:1.55}.meta{color:#64748b;font-size:12px;margin-bottom:20px}.badge{display:inline-block;border:1px solid #a7f3d0;background:#ecfdf5;color:#047857;border-radius:999px;padding:3px 8px;font-size:12px}h1{font-size:24px;margin:0 0 8px}h2{font-size:15px;margin:24px 0 8px;color:#334155}p{white-space:normal}table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#f1f5f9}.source{border:1px solid #e2e8f0;background:#f8fafc;border-radius:10px;padding:10px;margin:8px 0;font-size:12px}blockquote{border-left:3px solid #94a3b8;margin:8px 0 0;padding-left:10px;color:#475569}pre{white-space:pre-wrap;background:#fff;border:1px solid #e2e8f0;padding:8px;border-radius:8px}@media print{button{display:none}body{margin:18mm}}
-  </style></head><body><button onclick="window.print()" style="float:right;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:white">Print / Save PDF</button><div class="badge">ANDAI evidence report</div><h1>${escapeHtml(title)}</h1><div class="meta">Generated ${escapeHtml(new Date().toLocaleString())} · ${escapeHtml(sourceSummary(sources))}</div><h2>Answer</h2>${markdownToPrintableHtml(content)}<h2>Sources and citations</h2>${buildSourcesHtml(sources)}<script>setTimeout(()=>window.print(),300)</script></body></html>`);
+  printable.document.write(buildExportHtml(content, sources));
   printable.document.close();
+}
+
+function exportBoardMemo(content: string, sources: any) {
+  const printable = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+  if (!printable) return;
+  printable.document.write(buildExportHtml(content, sources, { memo: true }));
+  printable.document.close();
+}
+
+function exportAnswerWord(content: string, sources: any) {
+  downloadBlob("andai-answer-report.docx", buildDocxContent(content, sources));
 }
 
 function extractKeyAnswer(content: string): string {
@@ -303,39 +541,28 @@ function extractKeyAnswer(content: string): string {
 
 function sourceSummary(sources: any) {
   const docs = sources?.documents?.length || 0;
+  const docPages = groupDocumentCitations(sources?.documents || []).length;
   const faq = sources?.faq?.length || 0;
   const dbRows = sources?.database?.row_count ?? 0;
   const parts = [];
   if (dbRows) parts.push(`${dbRows} database row${dbRows === 1 ? "" : "s"}`);
-  if (docs) parts.push(`${docs} PDF passage${docs === 1 ? "" : "s"}`);
+  if (docs) parts.push(`${docs} PDF passage${docs === 1 ? "" : "s"} on ${docPages} page${docPages === 1 ? "" : "s"}`);
   if (faq) parts.push(`${faq} FAQ`);
   return parts.length ? parts.join(" · ") : "No source evidence attached";
 }
 
 function NumericResultChart({ data }: { data: any }) {
-  const rows = Array.isArray(data?.result) ? data.result : [];
-  if (!rows.length) return null;
+  const chart = buildChartRows(data);
+  if (!chart) return null;
 
-  const cols = Object.keys(rows[0] || {});
-  const numericCols = cols.filter(col => rows.some((row: any) => Number.isFinite(Number(row[col]))));
-  const labelCol = cols.find(col => !numericCols.includes(col) && rows.some((row: any) => row[col])) || cols[0];
-  const valueCol = numericCols.find(col => /score|rate|ratio|jobs|count|total|amount|value|percentage|percent/i.test(col)) || numericCols[0];
-  if (!labelCol || !valueCol) return null;
-
-  const chartRows = rows
-    .map((row: any) => ({ label: String(row[labelCol] ?? "—"), value: Number(row[valueCol]) }))
-    .filter((row: any) => Number.isFinite(row.value))
-    .slice(0, 8);
-  if (chartRows.length < 2) return null;
-
-  const max = Math.max(...chartRows.map((row: any) => Math.abs(row.value)), 1);
+  const max = Math.max(...chart.chartRows.map((row: any) => Math.abs(row.value)), 1);
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-700">
-        <BarChart3 size={14} className="text-red-500" /> Quick chart: {valueCol}
+        <BarChart3 size={14} className="text-red-500" /> Quick chart: {chart.valueCol}
       </div>
       <div className="space-y-2">
-        {chartRows.map((row: any, idx: number) => (
+        {chart.chartRows.map((row: any, idx: number) => (
           <div key={`${row.label}-${idx}`} className="grid grid-cols-[minmax(90px,180px)_1fr_auto] items-center gap-2 text-xs">
             <div className="truncate text-slate-600" title={row.label}>{row.label}</div>
             <div className="h-2 overflow-hidden rounded-full bg-slate-100">
@@ -367,8 +594,15 @@ function RecommendationBlock({ content, hasSources }: { content: string; hasSour
   );
 }
 
+function hasAiInsightContribution(content: string, sources: any): boolean {
+  if (sources?._meta?.ai_insight_contributed === true) return true;
+  if (sources?._meta?.ai_insight_contributed === false) return false;
+  return /^(insight|recommendation|recommended action|next step|why this matters)\s*:/im.test(content);
+}
+
 export function ExecutiveAnswerCard({ content, sources }: { content: string; sources: any }) {
   const hasSources = Boolean(sources?.database || sources?.documents?.length || sources?.faq?.length);
+  const hasAiInsight = hasAiInsightContribution(content, sources);
   return (
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-3">
@@ -394,12 +628,33 @@ export function ExecutiveAnswerCard({ content, sources }: { content: string; sou
             >
               <Download size={12} /> PDF
             </button>
+            <button
+              type="button"
+              onClick={() => exportAnswerWord(content, sources)}
+              className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-100"
+              title="Export answer for Microsoft Word"
+            >
+              <FileText size={12} /> Word
+            </button>
+            <button
+              type="button"
+              onClick={() => exportBoardMemo(content, sources)}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
+              title="Export board memo / executive briefing"
+            >
+              <BriefcaseBusiness size={12} /> Briefing
+            </button>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
           <span className={`rounded-full px-2 py-0.5 ${hasSources ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
             {hasSources ? "Evidence-backed" : "No evidence attached"}
           </span>
+          {hasAiInsight && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 font-medium text-purple-700">
+              <Lightbulb size={11} /> AI Insight added
+            </span>
+          )}
           <span>{sourceSummary(sources)}</span>
         </div>
       </div>

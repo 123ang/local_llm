@@ -47,6 +47,33 @@ def _sanitize_sources_for_user(sources: dict | None, current_user: User) -> dict
     return sanitized
 
 
+def _has_attached_evidence(sources: dict | None) -> bool:
+    if not sources:
+        return False
+    db_source = sources.get("database")
+    return bool(
+        sources.get("documents")
+        or sources.get("faq")
+        or (isinstance(db_source, dict) and db_source.get("row_count", 0) > 0)
+    )
+
+
+def _add_ai_insight_metadata(sources: dict | None, ai_insights: bool, answer: str) -> dict | None:
+    if not sources:
+        sources = {}
+    enriched = dict(sources)
+    has_evidence = _has_attached_evidence(enriched)
+    insight_marker = bool(
+        re.search(r"\b(insight|recommendation|recommended action|next step|why this matters)\s*:", answer or "", re.I)
+    )
+    enriched["_meta"] = {
+        **(enriched.get("_meta") or {}),
+        "ai_insights_enabled": bool(ai_insights),
+        "ai_insight_contributed": bool(ai_insights and (insight_marker or not has_evidence)),
+    }
+    return enriched
+
+
 async def _build_contextual_question(db: AsyncSession, session_id: int, current_message: str) -> str:
     """Attach recent chat context only when the message looks like a follow-up.
 
@@ -156,7 +183,8 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
             require_citations=ai_settings.require_citations,
         )
         answer = result.get("answer", "I couldn't find an answer to that question.")
-        sources = _sanitize_sources_for_user(result.get("sources"), current_user)
+        sources = _add_ai_insight_metadata(result.get("sources"), ai_insights, answer)
+        sources = _sanitize_sources_for_user(sources, current_user)
         model_tier = result.get("model_tier")
         sql_generated = None
     except Exception as e:
