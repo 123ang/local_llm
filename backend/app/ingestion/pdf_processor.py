@@ -14,7 +14,7 @@ from app.core.logger import logger
 from app.models.document import Document, DocumentChunk
 from app.ingestion.pdf_parser import extract_text_from_pdf, chunk_text
 from app.llm.embeddings.embedding_client import get_embedding
-from app.llm.vector_store import delete_document_vectors, upsert_document_chunks
+from app.llm.vector_store import update_document_chunk_vectors
 
 
 async def process_document(document_id: int) -> None:
@@ -75,12 +75,10 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
         )
         for old_chunk in existing.scalars().all():
             await db.delete(old_chunk)
-        delete_document_vectors(document_id)
         await db.commit()
 
         # 4. Embed and save each chunk
         chunk_objs = []
-        vector_batch: list[dict] = []
         for idx, chunk_data in enumerate(all_chunks):
             try:
                 embedding = await get_embedding(chunk_data["content"])
@@ -102,42 +100,17 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
             # Commit every 20 chunks to avoid large transactions
             if (idx + 1) % 20 == 0:
                 await db.flush()
-                vector_batch.extend([
-                    {
-                        "id": obj.id,
-                        "document_id": obj.document_id,
-                        "company_id": obj.company_id,
-                        "content": obj.content,
-                        "page_number": obj.page_number,
-                        "embedding": obj.embedding,
-                    }
-                    for obj in chunk_objs[-20:]
-                    if obj.id is not None
-                ])
+                indexed = await update_document_chunk_vectors(db, [obj.id for obj in chunk_objs[-20:] if obj.id is not None])
                 await db.commit()
-                upserted = upsert_document_chunks(vector_batch)
-                vector_batch.clear()
-                logger.info(f"Document {document_id}: saved {idx + 1}/{len(all_chunks)} chunks; indexed {upserted} vectors")
+                logger.info(f"Document {document_id}: saved {idx + 1}/{len(all_chunks)} chunks; indexed {indexed} vectors")
 
         await db.flush()
         remaining = len(chunk_objs) % 20
         if remaining:
-            vector_batch.extend([
-                {
-                    "id": obj.id,
-                    "document_id": obj.document_id,
-                    "company_id": obj.company_id,
-                    "content": obj.content,
-                    "page_number": obj.page_number,
-                    "embedding": obj.embedding,
-                }
-                for obj in chunk_objs[-remaining:]
-                if obj.id is not None
-            ])
+            indexed = await update_document_chunk_vectors(db, [obj.id for obj in chunk_objs[-remaining:] if obj.id is not None])
+            if indexed:
+                logger.info(f"Document {document_id}: indexed {indexed} remaining vectors")
         await db.commit()
-        upserted = upsert_document_chunks(vector_batch)
-        if upserted:
-            logger.info(f"Document {document_id}: indexed {upserted} remaining vectors")
 
         # 5. Update document status
         doc.chunk_count = len(chunk_objs)

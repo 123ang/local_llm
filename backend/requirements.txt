@@ -37,10 +37,7 @@ langchain-community==0.3.24
 langchain-ollama==0.3.2
 langchain-text-splitters==0.3.8
 
-# Vector store
-chromadb==0.6.3
-# Chroma 0.6.x telemetry adapter is incompatible with posthog 7.x.
-posthog<4.0.0
+# Vector search uses PostgreSQL pgvector extension (installed at DB level)
 
 # Background jobs
 celery==5.5.2

@@ -280,7 +280,78 @@ async def _search_faq(db: AsyncSession, company_id: int, question: str) -> list[
 
 
 async def _search_documents_semantic(db: AsyncSession, company_id: int, question: str) -> list[dict]:
-    """Semantic search with high relevance threshold."""
+    """Semantic search with pgvector first, then JSON/keyword fallbacks."""
+    try:
+        from app.llm.embeddings.embedding_client import get_embedding, cosine_similarity
+        from app.llm.vector_store import query_document_chunks
+
+        query_embedding = await get_embedding(question)
+        if not query_embedding:
+            raise ValueError("Empty embedding")
+
+        vector_hits = await query_document_chunks(
+            db,
+            company_id=company_id,
+            query_embedding=query_embedding,
+            limit=5,
+            min_score=0.5,
+        )
+        if vector_hits:
+            chunk_ids = [hit["chunk_id"] for hit in vector_hits]
+            chunk_result = await db.execute(
+                select(DocumentChunk, Document)
+                .join(Document, DocumentChunk.document_id == Document.id)
+                .where(DocumentChunk.id.in_(chunk_ids), Document.status == "ready")
+            )
+            by_id = {chunk.id: (chunk, doc) for chunk, doc in chunk_result.all()}
+            results = []
+            for hit in vector_hits:
+                pair = by_id.get(hit["chunk_id"])
+                if not pair:
+                    continue
+                chunk, doc = pair
+                results.append({
+                    "content": chunk.content[:600],
+                    "source": doc.original_name,
+                    "page": chunk.page_number,
+                    "score": round(hit["score"], 3),
+                })
+            if results:
+                return results
+
+        # Fallback: in-process cosine scan over JSON embeddings.
+        result = await db.execute(
+            select(DocumentChunk)
+            .join(Document, DocumentChunk.document_id == Document.id)
+            .where(DocumentChunk.company_id == company_id, Document.status == "ready", DocumentChunk.embedding.is_not(None))
+        )
+        chunks_with_embeddings = result.scalars().all()
+        scored = []
+        for chunk in chunks_with_embeddings:
+            score = cosine_similarity(query_embedding, chunk.embedding)
+            scored.append((score, chunk))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        results = []
+        for score, chunk in scored[:5]:
+            if score > 0.5:
+                doc_result = await db.execute(select(Document).where(Document.id == chunk.document_id))
+                doc = doc_result.scalar_one_or_none()
+                doc_name = doc.original_name if doc else f"doc_{chunk.document_id}"
+                results.append({
+                    "content": chunk.content[:600],
+                    "source": doc_name,
+                    "page": chunk.page_number,
+                    "score": round(score, 3),
+                })
+        if results:
+            return results
+
+    except Exception as emb_err:
+        logger.warning(f"Embedding/vector search failed — keyword fallback: {emb_err}")
+
+    # Keyword fallback
     result = await db.execute(
         select(DocumentChunk)
         .join(Document, DocumentChunk.document_id == Document.id)
@@ -290,72 +361,6 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
     if not chunks:
         return []
 
-    chunks_with_embeddings = [c for c in chunks if c.embedding]
-
-    if chunks_with_embeddings:
-        try:
-            from app.llm.embeddings.embedding_client import get_embedding, cosine_similarity
-            from app.llm.vector_store import query_document_chunks
-
-            query_embedding = await get_embedding(question)
-            if not query_embedding:
-                raise ValueError("Empty embedding")
-
-            vector_hits = query_document_chunks(
-                company_id=company_id,
-                query_embedding=query_embedding,
-                limit=5,
-                min_score=0.5,
-            )
-            if vector_hits:
-                chunk_ids = [hit["chunk_id"] for hit in vector_hits]
-                chunk_result = await db.execute(
-                    select(DocumentChunk, Document)
-                    .join(Document, DocumentChunk.document_id == Document.id)
-                    .where(DocumentChunk.id.in_(chunk_ids), Document.status == "ready")
-                )
-                by_id = {chunk.id: (chunk, doc) for chunk, doc in chunk_result.all()}
-                results = []
-                for hit in vector_hits:
-                    pair = by_id.get(hit["chunk_id"])
-                    if not pair:
-                        continue
-                    chunk, doc = pair
-                    results.append({
-                        "content": chunk.content[:600],
-                        "source": doc.original_name,
-                        "page": chunk.page_number,
-                        "score": round(hit["score"], 3),
-                    })
-                if results:
-                    return results
-
-            # Fallback: in-process cosine scan over JSON embeddings.
-            scored = []
-            for chunk in chunks_with_embeddings:
-                score = cosine_similarity(query_embedding, chunk.embedding)
-                scored.append((score, chunk))
-
-            scored.sort(key=lambda x: x[0], reverse=True)
-
-            results = []
-            for score, chunk in scored[:5]:
-                if score > 0.5:  # Higher threshold — only genuinely relevant chunks
-                    doc_result = await db.execute(select(Document).where(Document.id == chunk.document_id))
-                    doc = doc_result.scalar_one_or_none()
-                    doc_name = doc.original_name if doc else f"doc_{chunk.document_id}"
-                    results.append({
-                        "content": chunk.content[:600],
-                        "source": doc_name,
-                        "page": chunk.page_number,
-                        "score": round(score, 3),
-                    })
-            return results
-
-        except Exception as emb_err:
-            logger.warning(f"Embedding failed — keyword fallback: {emb_err}")
-
-    # Keyword fallback
     q_lower = question.lower()
     keywords = [w for w in q_lower.split() if len(w) > 2 and w not in STOPWORDS]
     if not keywords:

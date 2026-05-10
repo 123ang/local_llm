@@ -27,6 +27,12 @@ async def lifespan(app: FastAPI):
             raise RuntimeError("Set a strong SUPER_ADMIN_PASSWORD before running in production")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    try:
+        from app.llm.vector_store import ensure_pgvector_schema
+        if await ensure_pgvector_schema():
+            logger.info("pgvector document index ready")
+    except Exception as exc:
+        logger.warning(f"pgvector setup skipped: {exc}")
     logger.info("Database tables ready")
 
     # Ensure super admin exists

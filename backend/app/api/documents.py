@@ -12,7 +12,6 @@ from app.models.document import Document
 from app.models.user import User
 from app.services.audit_service import log_action
 from app.ingestion.pdf_processor import process_document
-from app.llm.vector_store import delete_document_vectors
 from pathlib import Path
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -121,6 +120,5 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found")
     if os.path.exists(doc.file_path):
         os.remove(doc.file_path)
-    delete_document_vectors(document_id)
     await db.delete(doc)
     await db.commit()

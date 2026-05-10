@@ -1,117 +1,109 @@
 from __future__ import annotations
 
-import os
-from functools import lru_cache
 from typing import Any
 
-os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.database import engine
 from app.core.logger import logger
 
-COLLECTION_NAME = "andai_document_chunks"
+VECTOR_DIMENSIONS = 768
 
 
-@lru_cache(maxsize=1)
-def _get_collection():
-    """Return a persistent Chroma collection, or None if Chroma is unavailable."""
+def _vector_literal(values: list[float]) -> str:
+    return "[" + ",".join(str(float(v)) for v in values) + "]"
+
+
+async def ensure_pgvector_schema() -> bool:
+    """Ensure pgvector exists and document_chunks has an indexed vector column."""
     try:
-        import chromadb
-        from chromadb.config import Settings as ChromaSettings
-
-        client = chromadb.PersistentClient(
-            path=settings.CHROMA_PERSIST_DIR,
-            settings=ChromaSettings(anonymized_telemetry=False),
-        )
-        return client.get_or_create_collection(
-            name=COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"},
-        )
-    except Exception as exc:  # Chroma is optional; DB JSON fallback remains available.
-        logger.warning(f"Chroma vector store unavailable; falling back to DB scan: {exc}")
-        return None
-
-
-def vector_store_available() -> bool:
-    return _get_collection() is not None
-
-
-def upsert_document_chunks(chunks: list[dict[str, Any]]) -> int:
-    """Upsert embedded document chunks into Chroma.
-
-    Expected keys: id, document_id, company_id, content, page_number, embedding.
-    """
-    collection = _get_collection()
-    if collection is None or not chunks:
-        return 0
-
-    valid = [c for c in chunks if c.get("embedding")]
-    if not valid:
-        return 0
-
-    collection.upsert(
-        ids=[f"chunk-{c['id']}" for c in valid],
-        embeddings=[c["embedding"] for c in valid],
-        documents=[c.get("content") or "" for c in valid],
-        metadatas=[
-            {
-                "chunk_id": int(c["id"]),
-                "document_id": int(c["document_id"]),
-                "company_id": int(c["company_id"]),
-                "page_number": int(c.get("page_number") or 0),
-            }
-            for c in valid
-        ],
-    )
-    return len(valid)
-
-
-def delete_document_vectors(document_id: int) -> None:
-    collection = _get_collection()
-    if collection is None:
-        return
-    try:
-        collection.delete(where={"document_id": int(document_id)})
+        async with engine.begin() as conn:
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+            await conn.execute(text(
+                f"ALTER TABLE document_chunks ADD COLUMN IF NOT EXISTS embedding_vector vector({VECTOR_DIMENSIONS})"
+            ))
+            await conn.execute(text(
+                "UPDATE document_chunks "
+                "SET embedding_vector = embedding::text::vector "
+                "WHERE embedding IS NOT NULL AND embedding_vector IS NULL"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_document_chunks_embedding_vector_hnsw "
+                "ON document_chunks USING hnsw (embedding_vector vector_cosine_ops)"
+            ))
+        return True
     except Exception as exc:
-        logger.warning(f"Failed deleting Chroma vectors for document {document_id}: {exc}")
+        logger.warning(f"pgvector schema unavailable; falling back to JSON embedding scan: {exc}")
+        return False
 
 
-def query_document_chunks(
+async def pgvector_available(db: AsyncSession) -> bool:
+    try:
+        result = await db.execute(text("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname='vector')"))
+        return bool(result.scalar())
+    except Exception:
+        return False
+
+
+async def update_document_chunk_vectors(db: AsyncSession, chunk_ids: list[int]) -> int:
+    """Copy JSON embeddings into the pgvector column for newly inserted chunks."""
+    ids = [int(i) for i in chunk_ids if i is not None]
+    if not ids:
+        return 0
+    id_list = ",".join(str(i) for i in ids)
+    result = await db.execute(text(
+        "UPDATE document_chunks "
+        "SET embedding_vector = embedding::text::vector "
+        f"WHERE id IN ({id_list}) AND embedding IS NOT NULL "
+        "RETURNING id"
+    ))
+    return len(result.fetchall())
+
+
+async def query_document_chunks(
+    db: AsyncSession,
     *,
     company_id: int,
     query_embedding: list[float],
     limit: int = 5,
     min_score: float = 0.5,
 ) -> list[dict[str, Any]]:
-    """Query Chroma and return chunk ids + cosine similarity scores.
-
-    Chroma returns cosine distance for hnsw:space=cosine, so score = 1 - distance.
-    """
-    collection = _get_collection()
-    if collection is None or not query_embedding:
+    """Search document chunks with pgvector cosine similarity."""
+    if not query_embedding:
         return []
 
     try:
-        result = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=limit,
-            where={"company_id": int(company_id)},
-            include=["metadatas", "distances"],
+        result = await db.execute(
+            text(
+                "SELECT dc.id AS chunk_id, dc.document_id, dc.page_number, "
+                "1 - (dc.embedding_vector <=> CAST(:embedding AS vector)) AS score "
+                "FROM document_chunks dc "
+                "JOIN documents d ON d.id = dc.document_id "
+                "WHERE dc.company_id = :company_id "
+                "AND d.status = 'ready' "
+                "AND dc.embedding_vector IS NOT NULL "
+                "ORDER BY dc.embedding_vector <=> CAST(:embedding AS vector) "
+                "LIMIT :limit"
+            ),
+            {
+                "embedding": _vector_literal(query_embedding),
+                "company_id": int(company_id),
+                "limit": int(limit),
+            },
         )
     except Exception as exc:
-        logger.warning(f"Chroma query failed; falling back to DB scan: {exc}")
+        logger.warning(f"pgvector query failed; falling back to JSON embedding scan: {exc}")
         return []
 
-    metadatas = (result.get("metadatas") or [[]])[0]
-    distances = (result.get("distances") or [[]])[0]
     hits: list[dict[str, Any]] = []
-    for metadata, distance in zip(metadatas, distances):
-        score = 1.0 - float(distance)
+    for row in result.mappings().all():
+        score = float(row["score"] or 0)
         if score >= min_score:
             hits.append({
-                "chunk_id": int(metadata["chunk_id"]),
-                "document_id": int(metadata["document_id"]),
-                "page_number": int(metadata.get("page_number") or 0),
+                "chunk_id": int(row["chunk_id"]),
+                "document_id": int(row["document_id"]),
+                "page_number": int(row.get("page_number") or 0),
                 "score": score,
             })
     return hits

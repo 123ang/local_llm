@@ -40,5 +40,3 @@ logs/
 # Temp
 setup_db.py
 
-# Local vector indexes
-backend/storage/chromadb/
