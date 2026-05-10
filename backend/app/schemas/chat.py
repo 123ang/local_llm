@@ -9,7 +9,7 @@ class ChatRequest(BaseModel):
     session_id: int | None = None
     company_id: int | None = None
     sources: list[str] | None = None  # subset of ["database", "documents", "faq"]; None = all
-    ai_insights: bool = True  # False = raw data only, skip LLM generation
+    ai_insights: bool = True  # False = strict source-only mode; no general knowledge fallback
     model_mode: Literal["auto", "instant", "thinking"] = "auto"
 
 

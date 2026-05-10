@@ -37,7 +37,8 @@ async def unified_query(
 
     ``enabled_sources`` is a list such as ["faq", "documents", "database"].
     When *None* (default) all three are searched.
-    When ``ai_insights`` is False, return raw retrieved data without LLM generation.
+    When ``ai_insights`` is False, strict evidence mode is used: answer only
+    from selected sources, and refuse if no matching source evidence is found.
     """
     all_sources = {"faq", "documents", "database"}
     active = set(enabled_sources) & all_sources if enabled_sources is not None else all_sources
@@ -90,12 +91,12 @@ async def unified_query(
             total_emp = row.get("total_employment")
             total_inv = row.get("total_investment_rm_million")
             answer = (
-                f"Berdasarkan trend semasa, anggaran peluang pekerjaan ialah **{float(jobs):,.2f} pekerjaan bagi setiap RM1 bilion pelaburan**.\n\n"
-                f"| Metrik | Nilai |\n|---|---:|\n"
-                f"| Jumlah pekerjaan digunakan | {int(total_emp):,} |\n"
-                f"| Jumlah pelaburan digunakan | RM{float(total_inv):,.2f} juta |\n"
-                f"| Pekerjaan per RM1 bilion | {float(jobs):,.2f} |\n\n"
-                "Nota: dikira daripada pecahan lokasi untuk mengelakkan pengiraan berganda; nilai 2025 dinormalisasi daripada RM kepada RM juta."
+                f"Based on the current trend, the estimated employment impact is **{float(jobs):,.2f} jobs per RM1 billion invested**.\n\n"
+                f"| Metric | Value |\n|---|---:|\n"
+                f"| Total employment used | {int(total_emp):,} |\n"
+                f"| Total investment used | RM{float(total_inv):,.2f} million |\n"
+                f"| Jobs per RM1 billion | {float(jobs):,.2f} |\n\n"
+                "Note: calculated from location-level breakdowns to avoid double-counting; 2025 values are normalized from RM to RM million."
             )
             return {"answer": answer, "sources": sources, "model_tier": "instant"}
 
@@ -128,17 +129,37 @@ async def unified_query(
                 parts.append(f'- {ds.display_name} ({ds.row_count} rows): columns {", ".join(col_names[:12])}')
             schema_summary = "Available database tables:\n" + "\n".join(parts)
 
-    # 4. If user wants raw data only (no AI insights), return immediately
+    # 4. Strict evidence mode: do not answer outside selected sources.
     if not ai_insights:
-        if not evidence:
+        strict_evidence = _build_strict_evidence(faq_evidence, db_evidence, doc_evidence, sources)
+        if not strict_evidence:
             return {
-                "answer": "No matching data found. Try a different question or enable AI Insights for general knowledge answers.",
+                "answer": _source_only_refusal(active),
                 "sources": sources,
                 "model_tier": "instant",
             }
-        return {"answer": "\n\n".join(evidence), "sources": sources, "model_tier": "instant"}
+        try:
+            from app.llm.ollama_client import generate
+            context = "\n\n".join(strict_evidence)
+            prompt = f"""Source evidence:
+{context}
 
-    # 5. Generate answer using LLM — ALWAYS call the model
+Question: {question}
+
+Answer using only the source evidence above. If the evidence does not contain the answer, say exactly: "I couldn't find that in the selected sources." Include source names/page numbers when available. Prefer Markdown tables for tabular data."""
+            system_msg = (
+                "You are ANDAI in Source-Only Mode. Use only the supplied source evidence. "
+                "Do not use outside knowledge, assumptions, or general advice. If the answer is not in the evidence, refuse briefly."
+            )
+            answer = await generate(prompt, system=system_msg, fast=True)
+            return {"answer": answer, "sources": sources, "model_tier": "instant"}
+        except ConnectionError:
+            return {"answer": "[AI offline — showing source evidence]\n\n" + "\n\n".join(strict_evidence), "sources": sources, "model_tier": "instant"}
+        except Exception as llm_err:
+            logger.error(f"Source-only generation error: {llm_err}")
+            return {"answer": "[AI error — showing source evidence]\n\n" + "\n\n".join(strict_evidence), "sources": sources, "model_tier": "instant"}
+
+    # 5. Generate answer using LLM — AI Insights may use general knowledge only when no sources match.
     has_evidence = bool(evidence)
     if model_mode == "instant":
         use_fast = True
@@ -159,7 +180,7 @@ async def unified_query(
 Question: {question}
 
 Answer concisely. If the data is tabular or the user asks for a table/jadual/table format, use a Markdown table instead of bullet points. You may add a short insight."""
-            system_msg = "You are ANDAI, a concise knowledge assistant. Present data clearly. Prefer Markdown tables for tabular data. Be brief."
+            system_msg = "You are ANDAI, a concise knowledge assistant. Present data clearly. Prefer Markdown tables for tabular data. Be brief. Ground factual claims in the supplied data."
         else:
             prompt = f"""{schema_summary}
 
@@ -198,14 +219,14 @@ def _format_kedah_sector_jobs_table(rows: list[dict], max_rows: int = 30) -> str
     if overall_rows:
         overall = overall_rows[0]
         lines.extend([
-            f"**Trend keseluruhan:** {float(overall.get('jobs_per_rm1b') or 0):,.2f} pekerjaan bagi setiap RM1 bilion pelaburan.",
+            f"**Overall trend:** {float(overall.get('jobs_per_rm1b') or 0):,.2f} jobs per RM1 billion invested.",
             "",
         ])
 
     lines.extend([
-        "Berikut ialah anggaran peluang pekerjaan bagi setiap RM1 bilion pelaburan mengikut sektor utama:",
+        "Here is the estimated employment impact per RM1 billion invested by main sector:",
         "",
-        "| Sektor | Jumlah Pekerjaan | Jumlah Pelaburan (RM juta) | Pekerjaan / RM1 bilion |",
+        "| Sector | Total Employment | Total Investment (RM million) | Jobs / RM1 billion |",
         "|---|---:|---:|---:|",
     ])
     for row in sector_rows[:max_rows]:
@@ -219,13 +240,45 @@ def _format_kedah_sector_jobs_table(rows: list[dict], max_rows: int = 30) -> str
     lines.append("")
     if len(sector_rows) == 1:
         lines.append(
-            f"Insight: sektor **{top.get('sector')}** mencatat **{float(top.get('jobs_per_rm1b') or 0):,.2f} pekerjaan per RM1 bilion**."
+            f"Insight: **{top.get('sector')}** records **{float(top.get('jobs_per_rm1b') or 0):,.2f} jobs per RM1 billion**."
         )
     else:
         lines.append(
-            f"Insight: sektor **{top.get('sector')}** mencatat anggaran tertinggi dalam paparan ini, iaitu **{float(top.get('jobs_per_rm1b') or 0):,.2f} pekerjaan per RM1 bilion**."
+            f"Insight: **{top.get('sector')}** has the highest estimate in this view, at **{float(top.get('jobs_per_rm1b') or 0):,.2f} jobs per RM1 billion**."
         )
     return "\n".join(lines)
+
+
+def _build_strict_evidence(
+    faq_evidence: list[str],
+    db_evidence: list[str],
+    doc_evidence: list[str],
+    sources: dict,
+) -> list[str]:
+    """Return evidence safe enough for Source-Only Mode."""
+    evidence: list[str] = []
+    evidence.extend(faq_evidence)
+    evidence.extend(db_evidence)
+
+    for i, chunk in enumerate(sources.get("documents") or []):
+        score = chunk.get("score", 0)
+        # Keyword fallback returns integer match counts; pgvector/JSON returns 0..1.
+        is_strong_keyword = isinstance(score, int) and not isinstance(score, bool) and score >= 2
+        is_strong_vector = not isinstance(score, int) and float(score or 0) >= 0.6
+        if is_strong_keyword or is_strong_vector:
+            if i < len(doc_evidence):
+                evidence.append(doc_evidence[i])
+
+    return evidence
+
+
+def _source_only_refusal(active_sources: set[str]) -> str:
+    selected = ", ".join(sorted(active_sources)) if active_sources else "selected sources"
+    return (
+        f"I couldn't find that in the selected sources ({selected}).\n\n"
+        "Source-Only Mode is enabled, so I can only answer from the selected documents, database, or FAQ. "
+        "Please ask about the uploaded/company data, or enable AI Insights if you want a general answer."
+    )
 
 
 def _extract_sql_table_refs(sql: str) -> set[str]:

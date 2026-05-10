@@ -259,9 +259,14 @@ export default function AssistantPage() {
             >
               {aiInsights && <Check size={12} strokeWidth={3} />}
               <Lightbulb size={12} />
-              {aiInsights && enabledSources.size === 0 ? "AI Only" : "AI Insights"}
+              {aiInsights ? (enabledSources.size === 0 ? "AI Only" : "AI Insights") : "Source Only"}
             </button>
           </div>
+          {!aiInsights && (
+            <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
+              Source Only is on: ANDAI will answer only from the selected database, PDFs/docs, or FAQ. If no evidence is found, it will refuse instead of using general knowledge.
+            </div>
+          )}
           <div className="mb-2 flex items-center gap-2 text-[11px] flex-wrap">
             <span className="text-slate-400">Model mode:</span>
             <button
