@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { Send, Plus, Trash2, Bot, User, Database, FileText, HelpCircle, Loader2, Check, Lightbulb, Zap, Brain } from "lucide-react";
-import { DatabaseResultTable, MessageContent, SourceBadges } from "./components/MessageRenderers";
+import { DatabaseResultTable, ExecutiveAnswerCard, SourceBadges } from "./components/MessageRenderers";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
 
@@ -165,7 +165,7 @@ export default function AssistantPage() {
               )}
               <div className={`max-w-[75%] ${msg.role === "user" ? "bg-red-600 text-white rounded-2xl rounded-br-md px-4 py-3" : "bg-slate-50 rounded-2xl rounded-bl-md px-4 py-3"}`}>
                 {msg.role === "assistant" ? (
-                  <MessageContent content={msg.content} />
+                  <ExecutiveAnswerCard content={msg.content} sources={msg.sources} />
                 ) : (
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 )}

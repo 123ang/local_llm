@@ -1,4 +1,4 @@
-import { Database, FileText, HelpCircle, ShieldCheck } from "lucide-react";
+import { BarChart3, Copy, Database, FileText, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
 
 export function MessageContent({ content }: { content: string }) {
   const lines = content.split("\n");
@@ -223,6 +223,113 @@ export function SourceBadges({ sources }: { sources: any }) {
           )}
         </div>
       </details>
+    </div>
+  );
+}
+
+function extractKeyAnswer(content: string): string {
+  const lines = content.split("\n").map(line => line.trim()).filter(Boolean);
+  const firstText = lines.find(line => !line.startsWith("|") && !/^:?-{3,}/.test(line));
+  return firstText?.replace(/^#+\s*/, "") || "Answer generated from selected sources";
+}
+
+function sourceSummary(sources: any) {
+  const docs = sources?.documents?.length || 0;
+  const faq = sources?.faq?.length || 0;
+  const dbRows = sources?.database?.row_count ?? 0;
+  const parts = [];
+  if (dbRows) parts.push(`${dbRows} database row${dbRows === 1 ? "" : "s"}`);
+  if (docs) parts.push(`${docs} PDF passage${docs === 1 ? "" : "s"}`);
+  if (faq) parts.push(`${faq} FAQ`);
+  return parts.length ? parts.join(" · ") : "No source evidence attached";
+}
+
+function NumericResultChart({ data }: { data: any }) {
+  const rows = Array.isArray(data?.result) ? data.result : [];
+  if (!rows.length) return null;
+
+  const cols = Object.keys(rows[0] || {});
+  const numericCols = cols.filter(col => rows.some((row: any) => Number.isFinite(Number(row[col]))));
+  const labelCol = cols.find(col => !numericCols.includes(col) && rows.some((row: any) => row[col])) || cols[0];
+  const valueCol = numericCols.find(col => /score|rate|ratio|jobs|count|total|amount|value|percentage|percent/i.test(col)) || numericCols[0];
+  if (!labelCol || !valueCol) return null;
+
+  const chartRows = rows
+    .map((row: any) => ({ label: String(row[labelCol] ?? "—"), value: Number(row[valueCol]) }))
+    .filter((row: any) => Number.isFinite(row.value))
+    .slice(0, 8);
+  if (chartRows.length < 2) return null;
+
+  const max = Math.max(...chartRows.map((row: any) => Math.abs(row.value)), 1);
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+      <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-700">
+        <BarChart3 size={14} className="text-red-500" /> Quick chart: {valueCol}
+      </div>
+      <div className="space-y-2">
+        {chartRows.map((row: any, idx: number) => (
+          <div key={`${row.label}-${idx}`} className="grid grid-cols-[minmax(90px,180px)_1fr_auto] items-center gap-2 text-xs">
+            <div className="truncate text-slate-600" title={row.label}>{row.label}</div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.max(4, Math.round(Math.abs(row.value) / max * 100))}%` }} />
+            </div>
+            <div className="tabular-nums text-slate-700">{row.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function RecommendationBlock({ content, hasSources }: { content: string; hasSources: boolean }) {
+  const insightLines = content
+    .split("\n")
+    .map(line => line.trim())
+    .filter(line => /^(insight|recommendation|recommended action|next step|why this matters)\s*:/i.test(line));
+  if (!insightLines.length) return null;
+  return (
+    <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50 p-3 text-xs text-purple-800">
+      <div className="mb-1 flex items-center gap-1.5 font-semibold">
+        <Lightbulb size={13} /> {hasSources ? "Insight / recommended action" : "AI insight"}
+      </div>
+      <div className="space-y-1">
+        {insightLines.map((line, idx) => <p key={idx}>{line}</p>)}
+      </div>
+    </div>
+  );
+}
+
+export function ExecutiveAnswerCard({ content, sources }: { content: string; sources: any }) {
+  const hasSources = Boolean(sources?.database || sources?.documents?.length || sources?.faq?.length);
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Executive answer</div>
+            <div className="mt-1 text-sm font-semibold text-slate-900">{extractKeyAnswer(content)}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard?.writeText(content)}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-50"
+            title="Copy answer"
+          >
+            <Copy size={12} /> Copy
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+          <span className={`rounded-full px-2 py-0.5 ${hasSources ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
+            {hasSources ? "Evidence-backed" : "No evidence attached"}
+          </span>
+          <span>{sourceSummary(sources)}</span>
+        </div>
+      </div>
+      <div className="p-3">
+        <MessageContent content={content} />
+        <NumericResultChart data={sources?.database} />
+        <RecommendationBlock content={content} hasSources={hasSources} />
+      </div>
     </div>
   );
 }

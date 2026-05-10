@@ -71,15 +71,16 @@ This checklist captures the next improvement phases before implementation. It in
 
 ## Phase 6 — Executive Answer UI
 
-- [ ] Add structured answer layout
-  - [ ] Key answer
-  - [ ] Evidence
-  - [ ] Table/chart
-  - [ ] Confidence
-  - [ ] Recommended action, only when AI Insights is on
-- [ ] Add chart rendering for numeric database results
-- [ ] Add collapsible raw data section
-- [ ] Add copy/export buttons
+- [x] Add structured answer layout
+  - [x] Key answer
+  - [x] Evidence
+  - [x] Table/chart
+  - [x] Confidence
+  - [x] Recommended action / insight block when present
+- [x] Add chart rendering for numeric database results
+- [x] Add collapsible raw data section
+- [x] Add copy button
+- [ ] Add export button *(defer to Phase 5 PDF export)*
 
 ## Phase 7 — Usage Analytics
 
@@ -110,6 +111,6 @@ This checklist captures the next improvement phases before implementation. It in
 - [ ] After token/context refresh, continue with Phase 4–7:
   - [x] Evaluation/Test Panel
   - [ ] Reports & PDF-first exports
-  - [ ] Executive Answer UI
+  - [x] Executive Answer UI
   - [x] Usage Analytics
 
