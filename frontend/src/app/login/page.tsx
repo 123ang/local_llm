@@ -82,9 +82,6 @@ export default function LoginPage() {
               {loading ? "Signing in..." : "Sign in"}
             </button>
 
-            <p className="mt-6 text-center text-xs text-slate-500">
-              Default: admin@askai.local / admin123
-            </p>
           </form>
         </div>
       </div>

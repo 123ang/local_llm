@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
-from app.core.dependencies import require_admin, require_super_admin
-from app.core.security import get_current_user
+from app.core.dependencies import require_admin, ensure_company_access
 from app.schemas.user import UserCreate, UserUpdate, UserOut
 from app.services.user_service import create_user, get_users, get_user, update_user, get_user_by_email
 from app.services.audit_service import log_action
@@ -27,6 +26,8 @@ async def list_users(company_id: int | None = Query(None), current_user: User = 
 
 @router.post("", response_model=UserOut, status_code=201)
 async def create_new_user(data: UserCreate, current_user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    if data.role not in ("user", "admin", "super_admin"):
+        raise HTTPException(status_code=400, detail="Invalid role")
     existing = await get_user_by_email(db, data.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -46,9 +47,21 @@ async def create_new_user(data: UserCreate, current_user: User = Depends(require
 @router.patch("/{user_id}", response_model=UserOut)
 async def update_existing_user(user_id: int, data: UserUpdate, current_user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
     updates = data.model_dump(exclude_unset=True)
-    user = await update_user(db, user_id, **updates)
+    user = await get_user(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+
+    if "role" in updates and updates["role"] not in ("user", "admin", "super_admin"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    if current_user.role != "super_admin":
+        ensure_company_access(current_user, user.company_id)
+        if "company_id" in updates and updates["company_id"] != user.company_id:
+            raise HTTPException(status_code=403, detail="Only super admin can move users between companies")
+        if "role" in updates and updates["role"] != user.role:
+            raise HTTPException(status_code=403, detail="Only super admin can change roles")
+
+    user = await update_user(db, user_id, **updates)
     return UserOut(
         id=user.id, email=user.email, full_name=user.full_name, role=user.role,
         company_id=user.company_id, is_active=user.is_active, created_at=user.created_at,

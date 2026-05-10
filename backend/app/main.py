@@ -20,6 +20,11 @@ from app.api.status import router as status_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} backend...")
+    if settings.ENVIRONMENT.lower() == "production":
+        if settings.SECRET_KEY == "askai-dev-secret-change-in-production":
+            raise RuntimeError("Set a strong SECRET_KEY before running in production")
+        if settings.SUPER_ADMIN_PASSWORD == "admin123":
+            raise RuntimeError("Set a strong SUPER_ADMIN_PASSWORD before running in production")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables ready")

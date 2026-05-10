@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Backgro
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, ensure_company_access, ensure_company_admin_access
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.schemas.document import DocumentOut
@@ -12,6 +12,7 @@ from app.models.document import Document
 from app.models.user import User
 from app.services.audit_service import log_action
 from app.ingestion.pdf_processor import process_document
+from app.llm.vector_store import delete_document_vectors
 from pathlib import Path
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -25,6 +26,7 @@ async def list_documents(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    ensure_company_access(current_user, company_id)
     result = await db.execute(
         select(Document).where(Document.company_id == company_id).order_by(Document.created_at.desc())
     )
@@ -39,6 +41,7 @@ async def upload_document(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    ensure_company_admin_access(current_user, company_id)
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Only PDF files are allowed")
 
@@ -85,6 +88,7 @@ async def reprocess_document(
     db: AsyncSession = Depends(get_db),
 ):
     """Re-trigger processing for a document (useful if Ollama was offline during upload)."""
+    ensure_company_admin_access(current_user, company_id)
     result = await db.execute(
         select(Document).where(Document.id == document_id, Document.company_id == company_id)
     )
@@ -108,6 +112,7 @@ async def delete_document(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    ensure_company_admin_access(current_user, company_id)
     result = await db.execute(
         select(Document).where(Document.id == document_id, Document.company_id == company_id)
     )
@@ -116,5 +121,6 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found")
     if os.path.exists(doc.file_path):
         os.remove(doc.file_path)
+    delete_document_vectors(document_id)
     await db.delete(doc)
     await db.commit()

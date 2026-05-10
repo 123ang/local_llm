@@ -5,6 +5,7 @@ from pathlib import Path
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Adaptive Neural Decision AI"
     API_PREFIX: str = "/api"
+    ENVIRONMENT: str = "development"
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:920214@localhost:5432/askai"
     DATABASE_URL_SYNC: str = "postgresql+psycopg2://postgres:920214@localhost:5432/askai"

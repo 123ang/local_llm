@@ -8,6 +8,8 @@ from app.models.faq import FAQItem
 from app.models.document import Document, DocumentChunk
 from app.models.dataset import Dataset
 
+SQL_TABLE_REF_RE = re.compile(r'\b(?:from|join)\s+((?:"?[a-zA-Z_][\w$]*"?\.)?"?[a-zA-Z_][\w$]*"?)', re.IGNORECASE)
+
 STOPWORDS = {
     "what", "which", "where", "when", "who", "how", "why", "does", "did",
     "the", "a", "an", "is", "are", "was", "were", "been", "being", "have",
@@ -71,6 +73,32 @@ async def unified_query(
                 db_evidence.append(f"[Database] {sql_result['result']}")
             sources["database"] = sql_result
 
+    # Deterministic formatting for key Kedah Investment demo questions.
+    # Avoids bullet-list answers when the user specifically needs a table.
+    if sources.get("database") and isinstance(sources["database"].get("result"), list):
+        sql_text = (sources["database"].get("sql") or "").lower()
+        rows = sources["database"].get("result") or []
+        if "kedah_sector_jobs_per_rm1b" in sql_text and rows:
+            return {
+                "answer": _format_kedah_sector_jobs_table(rows),
+                "sources": sources,
+                "model_tier": "instant",
+            }
+        if "kedah_overall_jobs_per_rm1b_trend" in sql_text and rows and "union all" not in sql_text:
+            row = rows[0]
+            jobs = row.get("jobs_per_rm1b")
+            total_emp = row.get("total_employment")
+            total_inv = row.get("total_investment_rm_million")
+            answer = (
+                f"Berdasarkan trend semasa, anggaran peluang pekerjaan ialah **{float(jobs):,.2f} pekerjaan bagi setiap RM1 bilion pelaburan**.\n\n"
+                f"| Metrik | Nilai |\n|---|---:|\n"
+                f"| Jumlah pekerjaan digunakan | {int(total_emp):,} |\n"
+                f"| Jumlah pelaburan digunakan | RM{float(total_inv):,.2f} juta |\n"
+                f"| Pekerjaan per RM1 bilion | {float(jobs):,.2f} |\n\n"
+                "Nota: dikira daripada pecahan lokasi untuk mengelakkan pengiraan berganda; nilai 2025 dinormalisasi daripada RM kepada RM juta."
+            )
+            return {"answer": answer, "sources": sources, "model_tier": "instant"}
+
     # Assemble evidence with smart filtering:
     # If DB returned good results, only include doc chunks with high relevance (>0.55)
     evidence = list(faq_evidence)
@@ -130,8 +158,8 @@ async def unified_query(
 
 Question: {question}
 
-Answer concisely. Use bullet points for tabular data. You may add a short insight."""
-            system_msg = "You are ANDAI, a concise knowledge assistant. Present data clearly. Be brief."
+Answer concisely. If the data is tabular or the user asks for a table/jadual/table format, use a Markdown table instead of bullet points. You may add a short insight."""
+            system_msg = "You are ANDAI, a concise knowledge assistant. Present data clearly. Prefer Markdown tables for tabular data. Be brief."
         else:
             prompt = f"""{schema_summary}
 
@@ -158,6 +186,59 @@ Answer from general knowledge. If relevant tables exist above, suggest how to re
             combined = "\n\n".join(evidence)
             return {"answer": f"[LLM error — showing raw results]\n\n{combined}", "sources": sources, "model_tier": "instant"}
         return {"answer": f"An error occurred while generating the answer. Please try again.", "sources": sources, "model_tier": "instant"}
+
+
+def _format_kedah_sector_jobs_table(rows: list[dict], max_rows: int = 30) -> str:
+    overall_rows = [r for r in rows if not r.get("sector") and r.get("jobs_per_rm1b") is not None]
+    sector_rows = [r for r in rows if r.get("sector")]
+    if not sector_rows:
+        return "No sector data found."
+
+    lines = []
+    if overall_rows:
+        overall = overall_rows[0]
+        lines.extend([
+            f"**Trend keseluruhan:** {float(overall.get('jobs_per_rm1b') or 0):,.2f} pekerjaan bagi setiap RM1 bilion pelaburan.",
+            "",
+        ])
+
+    lines.extend([
+        "Berikut ialah anggaran peluang pekerjaan bagi setiap RM1 bilion pelaburan mengikut sektor utama:",
+        "",
+        "| Sektor | Jumlah Pekerjaan | Jumlah Pelaburan (RM juta) | Pekerjaan / RM1 bilion |",
+        "|---|---:|---:|---:|",
+    ])
+    for row in sector_rows[:max_rows]:
+        sector = row.get("sector", "")
+        emp = row.get("total_employment") or 0
+        inv = row.get("total_investment_rm_million") or 0
+        jobs = row.get("jobs_per_rm1b") or 0
+        lines.append(f"| {sector} | {int(emp):,} | {float(inv):,.2f} | {float(jobs):,.2f} |")
+
+    top = max(sector_rows, key=lambda r: float(r.get("jobs_per_rm1b") or 0))
+    lines.append("")
+    if len(sector_rows) == 1:
+        lines.append(
+            f"Insight: sektor **{top.get('sector')}** mencatat **{float(top.get('jobs_per_rm1b') or 0):,.2f} pekerjaan per RM1 bilion**."
+        )
+    else:
+        lines.append(
+            f"Insight: sektor **{top.get('sector')}** mencatat anggaran tertinggi dalam paparan ini, iaitu **{float(top.get('jobs_per_rm1b') or 0):,.2f} pekerjaan per RM1 bilion**."
+        )
+    return "\n".join(lines)
+
+
+def _extract_sql_table_refs(sql: str) -> set[str]:
+    refs: set[str] = set()
+    for match in SQL_TABLE_REF_RE.finditer(sql):
+        ref = match.group(1).split(".")[-1].strip('"')
+        refs.add(ref)
+    return refs
+
+
+def _sql_uses_only_allowed_tables(sql: str, allowed_tables: set[str]) -> bool:
+    refs = _extract_sql_table_refs(sql)
+    return bool(refs) and refs.issubset(allowed_tables)
 
 
 def _format_rows_for_llm(rows: list[dict], max_rows: int = 30) -> str:
@@ -214,11 +295,42 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
     if chunks_with_embeddings:
         try:
             from app.llm.embeddings.embedding_client import get_embedding, cosine_similarity
+            from app.llm.vector_store import query_document_chunks
 
             query_embedding = await get_embedding(question)
             if not query_embedding:
                 raise ValueError("Empty embedding")
 
+            vector_hits = query_document_chunks(
+                company_id=company_id,
+                query_embedding=query_embedding,
+                limit=5,
+                min_score=0.5,
+            )
+            if vector_hits:
+                chunk_ids = [hit["chunk_id"] for hit in vector_hits]
+                chunk_result = await db.execute(
+                    select(DocumentChunk, Document)
+                    .join(Document, DocumentChunk.document_id == Document.id)
+                    .where(DocumentChunk.id.in_(chunk_ids), Document.status == "ready")
+                )
+                by_id = {chunk.id: (chunk, doc) for chunk, doc in chunk_result.all()}
+                results = []
+                for hit in vector_hits:
+                    pair = by_id.get(hit["chunk_id"])
+                    if not pair:
+                        continue
+                    chunk, doc = pair
+                    results.append({
+                        "content": chunk.content[:600],
+                        "source": doc.original_name,
+                        "page": chunk.page_number,
+                        "score": round(hit["score"], 3),
+                    })
+                if results:
+                    return results
+
+            # Fallback: in-process cosine scan over JSON embeddings.
             scored = []
             for chunk in chunks_with_embeddings:
                 score = cosine_similarity(query_embedding, chunk.embedding)
@@ -291,6 +403,58 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
 
     schema_text = "\n".join(schema_desc)
 
+    # Deterministic routing for cleaned Kedah Investment analytical views.
+    # These questions are important demo questions and should not depend on fragile Text-to-SQL generation.
+    q_lower = question.lower()
+    current_question = question.split("Current user question:")[-1] if "Current user question:" in question else question
+    current_q_lower = current_question.lower()
+    table_names = {ds.table_name for ds in datasets}
+    if "kedah_overall_jobs_per_rm1b_trend" in table_names and "kedah_sector_jobs_per_rm1b" in table_names:
+        wants_rm1b_jobs = (
+            ("rm1" in q_lower or "rm 1" in q_lower or "bilion" in q_lower or "billion" in q_lower)
+            and ("pekerjaan" in q_lower or "peluang" in q_lower or "jobs" in q_lower or "employment" in q_lower)
+        )
+        wants_sector_table_followup = (
+            ("table" in current_q_lower or "jadual" in current_q_lower)
+            and ("format" in current_q_lower or "table" in current_q_lower or "jadual" in current_q_lower)
+        )
+        wants_top_sector = any(token in current_q_lower for token in ["top", "highest", "tertinggi", "paling tinggi"])
+        wants_lowest_sector = any(token in current_q_lower for token in ["lowest", "terendah", "paling rendah"])
+        limit_match = re.search(r"\btop\s+(\d+)\b", current_q_lower)
+        sector_limit = int(limit_match.group(1)) if limit_match else (1 if ("highest" in current_q_lower or "tertinggi" in current_q_lower or "lowest" in current_q_lower or "terendah" in current_q_lower) else 100)
+        sector_limit = max(1, min(sector_limit, 100))
+        if (wants_rm1b_jobs and ("sektor" in q_lower or "sector" in q_lower or "industry" in q_lower)) or wants_sector_table_followup or wants_top_sector or wants_lowest_sector:
+            order_dir = "ASC" if wants_lowest_sector else "DESC"
+            sql = (
+                "SELECT 'Overall trend' AS scope, NULL::text AS sector, total_employment, "
+                "total_investment_rm_million, jobs_per_rm1b, methodology_note "
+                "FROM kedah_overall_jobs_per_rm1b_trend "
+                "UNION ALL "
+                "SELECT 'Sector breakdown' AS scope, sector, total_employment, "
+                "total_investment_rm_million, jobs_per_rm1b, "
+                "'Sector ratio = total_employment / (total_investment_rm_million / 1000). 2025 values normalized from RM to RM million.' AS methodology_note "
+                "FROM (SELECT sector, total_employment, total_investment_rm_million, jobs_per_rm1b FROM kedah_sector_jobs_per_rm1b "
+                f"ORDER BY jobs_per_rm1b {order_dir} LIMIT {sector_limit}) s "
+                "ORDER BY scope, jobs_per_rm1b DESC"
+            )
+            async with engine.begin() as conn:
+                res = await conn.execute(text(sql))
+                rows = res.fetchmany(50)
+                columns = list(res.keys())
+                data = [dict(zip(columns, row)) for row in rows]
+                return {"sql": sql, "result": data, "row_count": len(data)}
+        if wants_rm1b_jobs:
+            sql = (
+                'SELECT total_employment, total_investment_rm_million, jobs_per_rm1b, first_year, latest_year, methodology_note '
+                'FROM kedah_overall_jobs_per_rm1b_trend LIMIT 1'
+            )
+            async with engine.begin() as conn:
+                res = await conn.execute(text(sql))
+                rows = res.fetchmany(50)
+                columns = list(res.keys())
+                data = [dict(zip(columns, row)) for row in rows]
+                return {"sql": sql, "result": data, "row_count": len(data)}
+
     # Optional hint for common UUM-style tables so the LLM maps questions to the right columns
     table_hint = ""
     for ds in datasets:
@@ -299,6 +463,12 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
             table_hint += f'\n- Table "{ds.table_name}" (display: {ds.display_name}): student/course feedback; use course_id, course_name, lecturer_name, percentage, comment_text for questions about evaluations or what students said.'
         if "staff" in dname:
             table_hint += f'\n- Table "{ds.table_name}" (display: {ds.display_name}): staff directory; use no_staf, nama_staf_dan_gelaran, jawatan_akademik, pusat_pengajian for questions about lecturers or staff by school/department.'
+        if "kedah overall jobs" in dname or "rm1b trend" in dname:
+            table_hint += f'\n- Table "{ds.table_name}" (display: {ds.display_name}): use for Kedah current-trend questions like jobs/peluang pekerjaan per RM1 billion/RM1 bilion investment overall. It is already cleaned and avoids double-counting.'
+        if "kedah sector jobs" in dname:
+            table_hint += f'\n- Table "{ds.table_name}" (display: {ds.display_name}): use for Kedah questions asking jobs/peluang pekerjaan per RM1 billion/RM1 bilion by sector/sektor utama.'
+        if "kedah location jobs" in dname:
+            table_hint += f'\n- Table "{ds.table_name}" (display: {ds.display_name}): use for Kedah questions asking where/kawasan/lokasi employment opportunities are concentrated.'
 
     try:
         from app.llm.ollama_client import generate
@@ -322,6 +492,11 @@ Return ONLY a SELECT query (double-quote identifiers, LIMIT 100) or NONE."""
         sql = sql.rstrip(";`").strip()
 
         if not sql or sql.upper().strip() == "NONE" or not sql.upper().lstrip().startswith("SELECT"):
+            return None
+
+        allowed_tables = {ds.table_name for ds in datasets}
+        if not _sql_uses_only_allowed_tables(sql, allowed_tables):
+            logger.warning(f"Rejected SQL outside company dataset allowlist: {sql}")
             return None
 
         try:

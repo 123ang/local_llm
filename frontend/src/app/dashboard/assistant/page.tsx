@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { Send, Plus, Trash2, Bot, User, Database, FileText, HelpCircle, Loader2, Check, Lightbulb, Zap, Brain } from "lucide-react";
+import { DatabaseResultTable, MessageContent, SourceBadges } from "./components/MessageRenderers";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
 
@@ -96,73 +97,6 @@ export default function AssistantPage() {
       loadSessions();
     } catch {}
   };
-
-  const DatabaseResultTable = ({ data }: { data: any }) => {
-    if (!data) return null;
-    const result = data.result;
-    if (!result || typeof result === "string") return null;
-    if (!Array.isArray(result) || result.length === 0) return null;
-
-    const cols = Object.keys(result[0]);
-    return (
-      <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200">
-        <table className="w-full text-xs">
-          <thead className="bg-slate-100">
-            <tr>
-              {cols.map(c => (
-                <th key={c} className="px-3 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">{c}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {result.slice(0, 20).map((row: Record<string, unknown>, i: number) => (
-              <tr key={i} className="hover:bg-slate-50">
-                {cols.map(c => (
-                  <td key={c} className="px-3 py-1.5 text-slate-700 whitespace-nowrap max-w-[180px] truncate" title={String(row[c] ?? "")}>
-                    {String(row[c] ?? "")}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {result.length > 20 && (
-          <p className="px-3 py-1.5 text-xs text-slate-400 bg-slate-50 border-t border-slate-200">
-            Showing 20 of {result.length} rows
-          </p>
-        )}
-      </div>
-    );
-  };
-
-  const SourceBadges = ({ sources }: { sources: any }) => {
-    if (!sources) return null;
-    const hasFaq = sources.faq?.length > 0;
-    const hasDocs = sources.documents?.length > 0;
-    const hasDb = sources.database;
-    if (!hasFaq && !hasDocs && !hasDb) return null;
-
-    return (
-      <div className="mt-3 flex flex-wrap gap-2">
-        {hasFaq && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200">
-            <HelpCircle size={11} /> {sources.faq.length} FAQ
-          </span>
-        )}
-        {hasDocs && sources.documents.map((doc: any, i: number) => (
-          <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
-            <FileText size={11} /> {doc.source}{doc.page ? `, p.${doc.page}` : ""}
-          </span>
-        ))}
-        {hasDb && (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200">
-            <Database size={11} /> {hasDb.row_count ?? 0} rows from database
-          </span>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="flex h-[calc(100vh-8rem)] gap-4">
       {/* Sessions sidebar */}
@@ -230,7 +164,11 @@ export default function AssistantPage() {
                 </div>
               )}
               <div className={`max-w-[75%] ${msg.role === "user" ? "bg-red-600 text-white rounded-2xl rounded-br-md px-4 py-3" : "bg-slate-50 rounded-2xl rounded-bl-md px-4 py-3"}`}>
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                {msg.role === "assistant" ? (
+                  <MessageContent content={msg.content} />
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                )}
 
                 {msg.role === "assistant" && msg.sources?.database && (
                   <DatabaseResultTable data={msg.sources.database} />

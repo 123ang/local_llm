@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import get_db, engine
-from app.core.dependencies import require_admin
+from app.core.dependencies import require_admin, ensure_company_access, ensure_company_admin_access
 from app.core.security import get_current_user
 from app.core.config import settings
 from app.schemas.dataset import DatasetCreateManual, DatasetOut, DatasetImportOut, CSVPreviewOut, SQLPreviewOut, SQLTablePreview
@@ -26,28 +26,57 @@ TYPE_MAP = {
     "timestamp": "TIMESTAMP",
 }
 
-def _safe_table_name(company_id: int, name: str) -> str:
+def _safe_identifier(name: str) -> str:
     clean = re.sub(r'[^a-z0-9_]', '_', name.lower().strip())
-    return f"c{company_id}_{clean}"
+    clean = re.sub(r'_+', '_', clean).strip('_')
+    if not clean or clean[0].isdigit():
+        clean = f"col_{clean or 'field'}"
+    return clean[:63]
+
+
+def _safe_table_name(company_id: int, name: str) -> str:
+    return f"c{company_id}_{_safe_identifier(name)}"
+
+
+def _quote_identifier(identifier: str) -> str:
+    if not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", identifier):
+        raise HTTPException(status_code=400, detail=f"Invalid SQL identifier: {identifier}")
+    return f'"{identifier}"'
+
+
+def _dedupe_identifiers(names: list[str]) -> list[str]:
+    seen: dict[str, int] = {}
+    result: list[str] = []
+    for name in names:
+        base = _safe_identifier(name)
+        count = seen.get(base, 0)
+        seen[base] = count + 1
+        result.append(base if count == 0 else f"{base}_{count + 1}")
+    return result
 
 @router.get("/{company_id}", response_model=list[DatasetOut])
 async def list_datasets(company_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    ensure_company_access(current_user, company_id)
     result = await db.execute(select(Dataset).where(Dataset.company_id == company_id).order_by(Dataset.created_at.desc()))
     return list(result.scalars().all())
 
 @router.post("/{company_id}/manual", response_model=DatasetOut, status_code=201)
 async def create_manual_table(company_id: int, data: DatasetCreateManual, current_user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    ensure_company_admin_access(current_user, company_id)
+    if not data.columns:
+        raise HTTPException(status_code=400, detail="At least one column is required")
     table_name = _safe_table_name(company_id, data.display_name)
     cols = []
     schema_list = []
-    for col in data.columns:
+    safe_names = _dedupe_identifiers([col.name for col in data.columns])
+    for col, safe_name in zip(data.columns, safe_names):
         pg_type = TYPE_MAP.get(col.type, "TEXT")
         null = "" if col.nullable else " NOT NULL"
-        cols.append(f'"{col.name}" {pg_type}{null}')
-        schema_list.append({"name": col.name, "type": col.type, "nullable": col.nullable})
+        cols.append(f'{_quote_identifier(safe_name)} {pg_type}{null}')
+        schema_list.append({"name": safe_name, "type": col.type, "nullable": col.nullable, "original_name": col.name})
     
     col_defs = ", ".join(cols)
-    create_sql = f'CREATE TABLE IF NOT EXISTS "{table_name}" (id SERIAL PRIMARY KEY, {col_defs})'
+    create_sql = f'CREATE TABLE IF NOT EXISTS {_quote_identifier(table_name)} (id SERIAL PRIMARY KEY, {col_defs})'
     
     async with engine.begin() as conn:
         await conn.execute(text(create_sql))
@@ -73,7 +102,8 @@ async def upload_table_and_data(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload CSV → auto-create table from columns → insert data."""
-    if not file.filename.endswith(".csv"):
+    ensure_company_admin_access(current_user, company_id)
+    if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
     
     company_dir = Path(settings.UPLOAD_DIR) / "companies" / str(company_id) / "csv"
@@ -91,7 +121,8 @@ async def upload_table_and_data(
     # Infer schema from pandas dtypes
     schema_list = []
     col_defs = []
-    for col_name in df.columns:
+    safe_df_columns = _dedupe_identifiers([str(col_name) for col_name in df.columns])
+    for col_name, safe_col in zip(df.columns, safe_df_columns):
         dtype = str(df[col_name].dtype)
         if "int" in dtype:
             pg_type, col_type = "INTEGER", "integer"
@@ -103,11 +134,10 @@ async def upload_table_and_data(
             pg_type, col_type = "TIMESTAMP", "timestamp"
         else:
             pg_type, col_type = "TEXT", "text"
-        safe_col = re.sub(r'[^a-z0-9_]', '_', col_name.lower().strip())
-        col_defs.append(f'"{safe_col}" {pg_type}')
+        col_defs.append(f'{_quote_identifier(safe_col)} {pg_type}')
         schema_list.append({"name": safe_col, "type": col_type, "nullable": True, "original_name": col_name})
     
-    create_sql = f'CREATE TABLE IF NOT EXISTS "{table_name}" (id SERIAL PRIMARY KEY, {", ".join(col_defs)})'
+    create_sql = f'CREATE TABLE IF NOT EXISTS {_quote_identifier(table_name)} (id SERIAL PRIMARY KEY, {", ".join(col_defs)})'
     async with engine.begin() as conn:
         await conn.execute(text(create_sql))
     
@@ -115,9 +145,9 @@ async def upload_table_and_data(
     row_count = 0
     if not df.empty:
         safe_cols = [s["name"] for s in schema_list]
-        col_names = ", ".join(f'"{c}"' for c in safe_cols)
+        col_names = ", ".join(_quote_identifier(c) for c in safe_cols)
         placeholders = ", ".join(f":{c}" for c in safe_cols)
-        insert_sql = f'INSERT INTO "{table_name}" ({col_names}) VALUES ({placeholders})'
+        insert_sql = f'INSERT INTO {_quote_identifier(table_name)} ({col_names}) VALUES ({placeholders})'
         
         records = []
         for _, row in df.iterrows():
@@ -164,6 +194,11 @@ async def upload_data_to_existing(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload CSV data into an existing table."""
+    ensure_company_admin_access(current_user, company_id)
+    if mode not in ("append", "replace"):
+        raise HTTPException(status_code=400, detail="mode must be append or replace")
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are allowed")
     result = await db.execute(select(Dataset).where(Dataset.id == dataset_id, Dataset.company_id == company_id))
     dataset = result.scalar_one_or_none()
     if not dataset:
@@ -182,13 +217,13 @@ async def upload_data_to_existing(
     
     if mode == "replace":
         async with engine.begin() as conn:
-            await conn.execute(text(f'DELETE FROM "{dataset.table_name}"'))
+            await conn.execute(text(f'DELETE FROM {_quote_identifier(dataset.table_name)}'))
     
     schema = dataset.columns_schema or []
     safe_cols = [s["name"] for s in schema]
-    col_names = ", ".join(f'"{c}"' for c in safe_cols)
+    col_names = ", ".join(_quote_identifier(c) for c in safe_cols)
     placeholders = ", ".join(f":{c}" for c in safe_cols)
-    insert_sql = f'INSERT INTO "{dataset.table_name}" ({col_names}) VALUES ({placeholders})'
+    insert_sql = f'INSERT INTO {_quote_identifier(dataset.table_name)} ({col_names}) VALUES ({placeholders})'
     
     records = []
     for _, row in df.iterrows():
@@ -206,7 +241,7 @@ async def upload_data_to_existing(
     
     # Update row count
     async with engine.begin() as conn:
-        count_result = await conn.execute(text(f'SELECT COUNT(*) FROM "{dataset.table_name}"'))
+        count_result = await conn.execute(text(f'SELECT COUNT(*) FROM {_quote_identifier(dataset.table_name)}'))
         dataset.row_count = count_result.scalar()
     
     imp = DatasetImport(
@@ -229,6 +264,9 @@ async def get_dataset_rows(
     db: AsyncSession = Depends(get_db),
 ):
     """Fetch rows from a dataset table for viewing."""
+    ensure_company_admin_access(current_user, company_id)
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
     result = await db.execute(
         select(Dataset).where(Dataset.id == dataset_id, Dataset.company_id == company_id)
     )
@@ -241,10 +279,10 @@ async def get_dataset_rows(
     if not col_names:
         return {"columns": [], "rows": [], "total": 0}
 
-    col_list = ", ".join(f'"{c}"' for c in col_names)
+    col_list = ", ".join(_quote_identifier(c) for c in col_names)
     # Use id for stable ordering
-    sql = f'SELECT id, {col_list} FROM "{dataset.table_name}" ORDER BY id LIMIT :limit OFFSET :offset'
-    count_sql = f'SELECT COUNT(*) FROM "{dataset.table_name}"'
+    sql = f'SELECT id, {col_list} FROM {_quote_identifier(dataset.table_name)} ORDER BY id LIMIT :limit OFFSET :offset'
+    count_sql = f'SELECT COUNT(*) FROM {_quote_identifier(dataset.table_name)}'
 
     async with engine.begin() as conn:
         rows_result = await conn.execute(text(sql), {"limit": limit, "offset": offset})
@@ -260,6 +298,9 @@ async def get_dataset_rows(
 @router.post("/{company_id}/preview-csv", response_model=CSVPreviewOut)
 async def preview_csv(company_id: int, file: UploadFile = File(...), current_user: User = Depends(require_admin)):
     """Preview a CSV file before importing."""
+    ensure_company_admin_access(current_user, company_id)
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are allowed")
     df = pd.read_csv(file.file, nrows=100)
     return CSVPreviewOut(
         columns=list(df.columns),
@@ -287,6 +328,7 @@ async def preview_sql(
     db: AsyncSession = Depends(get_db),
 ):
     """Parse a SQL dump and return a preview of tables + data it contains."""
+    ensure_company_admin_access(current_user, company_id)
     if not file.filename or not file.filename.lower().endswith(".sql"):
         raise HTTPException(status_code=400, detail="Only .sql files are allowed")
 
@@ -336,6 +378,7 @@ async def upload_sql(
     db: AsyncSession = Depends(get_db),
 ):
     """Import a SQL dump: create tables and insert data, returns list of created datasets."""
+    ensure_company_admin_access(current_user, company_id)
     if not file.filename or not file.filename.lower().endswith(".sql"):
         raise HTTPException(status_code=400, detail="Only .sql files are allowed")
 
