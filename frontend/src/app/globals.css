@@ -1,4 +1,5 @@
-@import "tailwindcss";
+/* Explicit scan root: avoids missing utilities when Tailwind’s cwd differs (CI/Docker). */
+@import "tailwindcss" source("../../");
 
 :root {
   --primary: #dc2626;
