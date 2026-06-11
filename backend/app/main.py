@@ -1,8 +1,10 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import settings
-from app.core.database import engine, Base, async_session
+from fastapi.responses import JSONResponse
+from app.core.config import settings, validate_runtime_security_settings, build_cors_origins
+from app.core.database import engine, text_to_sql_engine, Base, async_session
+from app.core.errors import CORRELATION_ID_RE, correlation_id_from_request, public_error_detail
 from app.core.logger import logger, security_logger, install_access_log_probe_filter
 from app.core.probe_detection import is_suspicious_probe_path
 
@@ -22,11 +24,7 @@ from app.api.analytics import router as analytics_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} backend...")
-    if settings.ENVIRONMENT.lower() == "production":
-        if settings.SECRET_KEY == "askai-dev-secret-change-in-production":
-            raise RuntimeError("Set a strong SECRET_KEY before running in production")
-        if settings.SUPER_ADMIN_PASSWORD == "admin123":
-            raise RuntimeError("Set a strong SUPER_ADMIN_PASSWORD before running in production")
+    validate_runtime_security_settings(settings)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     try:
@@ -46,6 +44,8 @@ async def lifespan(app: FastAPI):
     yield
 
     await engine.dispose()
+    if text_to_sql_engine is not None:
+        await text_to_sql_engine.dispose()
     logger.info(f"{settings.PROJECT_NAME} backend shutdown")
 
 
@@ -55,23 +55,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-_cors_origins = [
-    settings.FRONTEND_URL,
-    "http://localhost:3000",
-    "http://localhost:3001",
-]
-if settings.CORS_EXTRA_ORIGINS:
-    _cors_origins.extend(
-        o.strip() for o in settings.CORS_EXTRA_ORIGINS.split(",") if o.strip()
-    )
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_cors_origins,
+    allow_origins=build_cors_origins(settings),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def correlation_id_middleware(request: Request, call_next):
+    supplied_id = request.headers.get("x-correlation-id", "")
+    if supplied_id and CORRELATION_ID_RE.fullmatch(supplied_id):
+        request.state.correlation_id = supplied_id
+    else:
+        correlation_id_from_request(request)
+
+    response = await call_next(request)
+    response.headers["X-Correlation-ID"] = request.state.correlation_id
+    return response
 
 
 @app.middleware("http")
@@ -85,6 +88,17 @@ async def security_probe_logger(request: Request, call_next):
             f'probe_detected ip={client_ip} method={request.method} path="{path}" status={response.status_code} ua="{user_agent}"'
         )
     return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    correlation_id = correlation_id_from_request(request)
+    logger.exception("Unhandled API error correlation_id=%s", correlation_id)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": public_error_detail(request, "Internal server error.", exc)},
+        headers={"X-Correlation-ID": correlation_id},
+    )
 
 
 app.include_router(auth_router, prefix=settings.API_PREFIX)

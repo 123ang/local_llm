@@ -1,0 +1,54 @@
+-- Run with psql as a PostgreSQL administrator:
+-- psql -v text_reader_password='<strong-random-password>' \
+--   -d askai -f postgres_roles.sql.example
+--
+-- Replace askai_app below if DATABASE_URL uses a different application role.
+
+BEGIN;
+
+CREATE ROLE askai_text_reader LOGIN PASSWORD :'text_reader_password';
+CREATE ROLE askai_dataset_importer NOLOGIN;
+
+GRANT askai_dataset_importer TO askai_app;
+GRANT CONNECT ON DATABASE askai TO askai_text_reader;
+GRANT USAGE ON SCHEMA public TO askai_text_reader;
+GRANT USAGE, CREATE ON SCHEMA public TO askai_dataset_importer;
+
+DO $$
+DECLARE
+    dataset_table record;
+BEGIN
+    FOR dataset_table IN
+        SELECT schemaname, tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+          AND tablename ~ '^c[0-9]+_'
+    LOOP
+        EXECUTE format(
+            'GRANT SELECT ON TABLE %I.%I TO askai_text_reader',
+            dataset_table.schemaname,
+            dataset_table.tablename
+        );
+        EXECUTE format(
+            'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE %I.%I TO askai_dataset_importer',
+            dataset_table.schemaname,
+            dataset_table.tablename
+        );
+    END LOOP;
+
+    FOR dataset_table IN
+        SELECT schemaname, sequencename AS tablename
+        FROM pg_sequences
+        WHERE schemaname = 'public'
+          AND sequencename ~ '^c[0-9]+_'
+    LOOP
+        EXECUTE format(
+            'GRANT USAGE, SELECT ON SEQUENCE %I.%I TO askai_dataset_importer',
+            dataset_table.schemaname,
+            dataset_table.tablename
+        );
+    END LOOP;
+END
+$$;
+
+COMMIT;

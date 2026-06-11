@@ -10,7 +10,7 @@ Usage:
 
 Requirements:
   - Backend running at http://localhost:8000
-  - Admin credentials: admin@askai.local / admin123
+  - ASKAI_ADMIN_EMAIL and ASKAI_ADMIN_PASSWORD environment variables
   - (Optional) A company must exist with id=1
 """
 
@@ -22,11 +22,16 @@ import urllib.parse
 import urllib.error
 
 BASE_URL = "http://localhost:8000/api"
-ADMIN_EMAIL = "admin@askai.local"
-ADMIN_PASSWORD = "admin123"
+ADMIN_EMAIL = os.environ.get("ASKAI_ADMIN_EMAIL")
+ADMIN_PASSWORD = os.environ.get("ASKAI_ADMIN_PASSWORD")
 COMPANY_ID = 1  # Demo Company
 
 SAMPLES_DIR = os.path.dirname(os.path.abspath(__file__))
+
+if not ADMIN_EMAIL or not ADMIN_PASSWORD:
+    raise RuntimeError(
+        "Set ASKAI_ADMIN_EMAIL and ASKAI_ADMIN_PASSWORD before running the seed script"
+    )
 
 FAQ_ITEMS = [
     {

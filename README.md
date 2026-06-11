@@ -266,12 +266,12 @@ Then open http://localhost:3000 in your browser.
 
 ---
 
-## Default Accounts
+## Initial Account
 
-| Email | Password | Role | Company |
-|-------|----------|------|---------|
-| `admin@askai.local` | `admin123` | Super Admin | — (platform-wide access) |
-| `user@demo.com` | `demo123` | Admin | Demo Company |
+The backend creates the initial super-admin account from
+`SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD` on first startup. Set both
+values in `backend/.env`; the repository does not ship a default password or
+demo login.
 
 ### Role Permissions
 
@@ -294,12 +294,12 @@ Then open http://localhost:3000 in your browser.
 
 1. Go to http://localhost:3000
 2. You will be redirected to the login page
-3. Enter `admin@askai.local` / `admin123`
+3. Enter the super-admin credentials configured in `backend/.env`
 4. You should see the Dashboard with Overview page
 
 ### Test 2: Create a Company
 
-1. Login as `admin@askai.local` (super admin)
+1. Login with the configured super-admin account
 2. Click **Companies** in the sidebar (under Platform)
 3. Click **Add Company**
 4. Enter name: "My Test Company", click Create
@@ -321,7 +321,7 @@ Then open http://localhost:3000 in your browser.
 
 ### Test 4: Add FAQ Items
 
-1. Login as an admin user (e.g., `user@demo.com` / `demo123`)
+1. Login with an admin account created for the target company
 2. Click **FAQ** in the sidebar (under Administration)
 3. Click **Add FAQ**
 4. Enter:
@@ -469,8 +469,9 @@ The backend exposes a REST API. Full interactive docs available at http://localh
 - **Module not found**: Run `pnpm install` in the `frontend/` directory
 
 ### Login fails
-- Default super admin: `admin@askai.local` / `admin123`
-- If no users exist, restart the backend — it creates the super admin on startup
+- Confirm `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD` are set in `backend/.env`
+- If no users exist, restart the backend; it creates the configured super admin on startup
+- There is no repository-provided default password
 
 ### Chat returns "LLM offline"
 - Make sure Ollama is running: visit http://localhost:11434
@@ -504,17 +505,36 @@ This is a known passlib/bcrypt compatibility warning. It's harmless — authenti
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql+asyncpg://postgres:920214@localhost:5432/askai` | Async DB connection |
-| `DATABASE_URL_SYNC` | `postgresql+psycopg2://postgres:920214@localhost:5432/askai` | Sync DB connection (Alembic) |
+| `DATABASE_URL` | required | Application-role async DB connection |
+| `DATABASE_URL_SYNC` | required | Application-role sync DB connection for Alembic |
+| `TEXT_TO_SQL_DATABASE_URL` | required | Dedicated read-only `askai_text_reader` connection |
+| `TEXT_TO_SQL_DB_ROLE` | `askai_text_reader` | PostgreSQL role allowed to read customer dataset tables |
+| `DATASET_IMPORT_DB_ROLE` | `askai_dataset_importer` | Restricted role used only while creating/importing dataset tables |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis connection |
-| `SECRET_KEY` | (dev key) | JWT signing secret |
+| `SECRET_KEY` | required | JWT signing secret of at least 32 random characters |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama API URL |
 | `LLM_MODEL` | `gemma4:latest` | Chat model |
 | `LLM_MODEL_FAST` | `qwen2.5-coder:1.5b` | Code-specialized model for SQL generation |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model |
+| `MAX_SQL_UPLOAD_BYTES` | `10485760` | Maximum SQL dump upload size |
+| `MAX_SQL_IMPORT_TABLES` | `25` | Maximum tables accepted from one SQL dump |
+| `MAX_SQL_IMPORT_COLUMNS_PER_TABLE` | `200` | Maximum columns accepted per imported table |
+| `MAX_SQL_IMPORT_ROWS` | `100000` | Maximum rows accepted from one SQL dump |
 | `FRONTEND_URL` | `http://localhost:3000` | CORS allowed origin |
 | `SUPER_ADMIN_EMAIL` | `admin@askai.local` | Auto-created super admin |
-| `SUPER_ADMIN_PASSWORD` | `admin123` | Super admin password |
+| `SUPER_ADMIN_PASSWORD` | required | Strong initial password; no default is provided |
+
+Provision the restricted PostgreSQL roles before starting the backend:
+
+```bash
+cd deploy
+psql -v text_reader_password='<strong-random-password>' \
+  -d askai -f postgres_roles.sql.example
+```
+
+Run this as a PostgreSQL administrator after replacing `askai_app` in the
+template if your application role has a different name. Use the same reader
+password in `TEXT_TO_SQL_DATABASE_URL`.
 
 ---
 

@@ -19,6 +19,7 @@ frontend/out/
 
 # Storage
 storage/uploads/companies/*/
+backend/storage/uploads/
 storage/chromadb/
 storage/exports/
 
@@ -43,3 +44,4 @@ setup_db.py
 
 # Local database backups
 backups/*.dump
+/*.sql

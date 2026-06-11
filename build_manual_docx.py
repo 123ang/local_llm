@@ -12,7 +12,7 @@ from docx.shared import Inches, Pt
 
 ROOT = Path("/Users/123ang/andai-runtime/local_llm")
 HTML_PATH = ROOT / "AskAI_Web_User_Manual.html"
-DOCX_PATH = ROOT / "AskAI_Web_User_Manual.docx"
+DOCX_PATH = ROOT / "docs" / "manuals" / "AskAI_Web_User_Manual.docx"
 
 
 def normalized_text(text: str) -> str:
@@ -201,6 +201,7 @@ def process_tag(document: Document, node):
 def build_docx():
     soup = BeautifulSoup(HTML_PATH.read_text(encoding="utf-8"), "html.parser")
     document = Document()
+    DOCX_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     section = document.sections[0]
     section.top_margin = Inches(0.8)

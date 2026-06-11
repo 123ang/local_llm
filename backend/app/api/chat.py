@@ -1,9 +1,11 @@
 import re
 import time
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core.database import get_db
+from app.core.errors import correlation_id_from_request, public_error_detail
+from app.core.logger import logger
 from app.core.security import get_current_user
 from app.core.dependencies import ensure_company_access
 from app.schemas.chat import ChatRequest, ChatResponse, ChatSessionOut, ChatMessageOut
@@ -132,7 +134,12 @@ async def get_messages(session_id: int, current_user: User = Depends(get_current
     return list(result.scalars().all())
 
 @router.post("", response_model=ChatResponse)
-async def ask_question(data: ChatRequest, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def ask_question(
+    data: ChatRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     start = time.time()
     
     requested_company_id = data.company_id or current_user.company_id
@@ -188,7 +195,20 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
         model_tier = result.get("model_tier")
         sql_generated = None
     except Exception as e:
-        answer = f"I'm sorry, I encountered an error processing your question. The LLM service may not be available. Error: {str(e)}"
+        correlation_id = correlation_id_from_request(request)
+        logger.exception(
+            "Chat processing failed correlation_id=%s",
+            correlation_id,
+        )
+        detail = public_error_detail(
+            request,
+            "The AI service is temporarily unavailable.",
+            e,
+        )
+        answer = (
+            "I'm sorry, I couldn't process that question safely. "
+            f"Please try again. Reference: {detail['correlation_id']}"
+        )
         sources = None
         model_tier = None
         sql_generated = None

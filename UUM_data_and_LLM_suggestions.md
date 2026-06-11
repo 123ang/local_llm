@@ -1,14 +1,14 @@
 # UUM Data & LLM Question Suggestions
 
-This document describes the UUM database content (`uum_db.sql`), the imported tables used by the AskAI assistant, and suggested questions users can ask the LLM.
+This document describes the external UUM database dump, the imported tables used by the AskAI assistant, and suggested questions users can ask the LLM.
 
 ---
 
 ## 1. Data source
 
-- **File:** `uum_db.sql`
+- **File:** kept outside the repository and selected with `UUM_SQL_DUMP_PATH`
 - **Origin:** phpMyAdmin dump from MariaDB (UUM database)
-- **Import:** Script `investment/fix_uum_import.py` loads the SQL into the app’s PostgreSQL DB under company **UUM utlc** (Company ID: 2).
+- **Import:** Set `UUM_SQL_DUMP_PATH=/secure/path/to/uum_db.sql`, then run `investment/fix_uum_import.py` to load the SQL into the app's PostgreSQL DB under company **UUM**.
 - **Post-import tables:** `c2_comments`, `c2_staff` (prefix `c2_` = company 2).
 
 ---
@@ -73,7 +73,7 @@ Staff directory snapshot (e.g. 2023): one row per staff member with role and sch
 
 ## 4. What was implemented
 
-- **Import & parser:** `uum_db.sql` is parsed (quote-aware split, CREATE+INSERT in same block, VALUES span) and loaded into PostgreSQL via `fix_uum_import.py`. Default timestamp is applied when `imported_at` is missing.
+- **Import & parser:** The externally supplied SQL dump is parsed and loaded into PostgreSQL via `fix_uum_import.py`. The import validates supported SQL structures and applies the default timestamp when `imported_at` is missing.
 - **Assistant UI:** When the chat is empty, the Assistant page shows **“Try asking”** with clickable suggestion chips that fill the input.
 - **SQL hints:** In `backend/app/llm/unified_query.py`, the text-to-SQL prompt gets short semantic hints for tables whose display name contains “comment” or “staff”, and an extra rule for “what do students say” / feedback-style questions so the model uses the comments table and columns like `comment_text`, `lecturer_name`, `course_name`.
 

@@ -17,7 +17,27 @@ Handles the full range of phpMyAdmin / mysqldump output:
 
 import re
 from dataclasses import dataclass, field
-from app.core.logger import logger
+
+
+class SQLImportValidationError(ValueError):
+    pass
+
+
+@dataclass(frozen=True)
+class SQLImportLimits:
+    max_tables: int = 25
+    max_columns_per_table: int = 200
+    max_total_rows: int = 100_000
+    max_cell_chars: int = 100_000
+
+
+async def read_sql_upload(file, max_bytes: int) -> bytes:
+    raw_bytes = await file.read(max_bytes + 1)
+    if len(raw_bytes) > max_bytes:
+        raise SQLImportValidationError(
+            f"SQL upload exceeds the {max_bytes}-byte size limit"
+        )
+    return raw_bytes
 
 # ── MySQL → PostgreSQL type mapping ──────────────────────────────────
 
@@ -102,11 +122,27 @@ def _preprocess(sql: str) -> str:
 
 def _map_mysql_type(raw_type: str, params: str | None) -> str:
     key = raw_type.lower().strip()
-    pg = MYSQL_TO_PG_TYPE.get(key, "TEXT")
+    pg = MYSQL_TO_PG_TYPE.get(key)
+    if pg is None:
+        raise SQLImportValidationError(
+            f"Unsupported SQL column type: {raw_type}"
+        )
     if key in ("varchar", "char") and params:
-        return f"{pg}({params})"
+        if not re.fullmatch(r"\d{1,5}", params.strip()):
+            raise SQLImportValidationError(f"Invalid length for {raw_type}")
+        length = int(params)
+        if not 1 <= length <= 65_535:
+            raise SQLImportValidationError(f"Invalid length for {raw_type}")
+        return f"{pg}({length})"
     if key in ("decimal", "numeric") and params:
-        return f"{pg}({params})"
+        match = re.fullmatch(r"\s*(\d{1,4})(?:\s*,\s*(\d{1,4}))?\s*", params)
+        if not match:
+            raise SQLImportValidationError(f"Invalid precision for {raw_type}")
+        precision = int(match.group(1))
+        scale = int(match.group(2) or 0)
+        if not 1 <= precision <= 1_000 or not 0 <= scale <= precision:
+            raise SQLImportValidationError(f"Invalid precision for {raw_type}")
+        return f"{pg}({precision},{scale})"
     return pg
 
 
@@ -128,7 +164,7 @@ def _parse_column_line(line: str) -> ParsedColumn | None:
 
     m = re.match(r"^`(\w+)`\s+(\w+)(?:\(([^)]*)\))?(.*)", stripped, re.IGNORECASE)
     if not m:
-        return None
+        raise SQLImportValidationError("Unsupported SQL column definition")
 
     name = m.group(1)
     raw_type = m.group(2)
@@ -149,6 +185,46 @@ def _parse_column_line(line: str) -> ParsedColumn | None:
         is_primary_key=False,
         original_type=original_type,
     )
+
+
+def _split_column_definitions(body: str) -> list[str]:
+    definitions: list[str] = []
+    start = 0
+    depth = 0
+    in_string = False
+    in_backticks = False
+    escape_next = False
+
+    for index, char in enumerate(body):
+        if escape_next:
+            escape_next = False
+            continue
+        if in_string:
+            if char == "\\":
+                escape_next = True
+            elif char == "'":
+                in_string = False
+            continue
+        if in_backticks:
+            if char == "`":
+                in_backticks = False
+            continue
+        if char == "'":
+            in_string = True
+        elif char == "`":
+            in_backticks = True
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth = max(0, depth - 1)
+        elif char == "," and depth == 0:
+            definitions.append(body[start:index].strip())
+            start = index + 1
+
+    tail = body[start:].strip()
+    if tail:
+        definitions.append(tail)
+    return definitions
 
 
 # ── Body-level PK detection ─────────────────────────────────────────
@@ -345,10 +421,40 @@ _RE_ALTER_AI = re.compile(
 )
 
 
-def parse_sql_dump(content: str) -> list[ParsedTable]:
+def _columns_from_create_body(
+    body: str,
+    limits: SQLImportLimits,
+) -> list[ParsedColumn]:
+    pk_col = _extract_primary_key_from_body(body)
+    columns: list[ParsedColumn] = []
+    for definition in _split_column_definitions(body):
+        column = _parse_column_line(definition)
+        if not column:
+            continue
+        if pk_col and column.name == pk_col:
+            column.is_primary_key = True
+            column.nullable = False
+            if column.pg_type in ("INTEGER", "BIGINT", "SMALLINT"):
+                column.pg_type = "BIGSERIAL" if column.pg_type == "BIGINT" else "SERIAL"
+        columns.append(column)
+        if len(columns) > limits.max_columns_per_table:
+            raise SQLImportValidationError(
+                f"SQL table exceeds the {limits.max_columns_per_table}-column limit"
+            )
+    if not columns:
+        raise SQLImportValidationError("SQL table has no supported columns")
+    return columns
+
+
+def parse_sql_dump(
+    content: str,
+    limits: SQLImportLimits | None = None,
+) -> list[ParsedTable]:
     """Parse a full MySQL/MariaDB SQL dump and return ParsedTable objects."""
+    limits = limits or SQLImportLimits()
     content = _preprocess(content)
     tables: dict[str, ParsedTable] = {}
+    total_rows = 0
 
     blocks = _split_sql_statements(content)
 
@@ -373,19 +479,14 @@ def parse_sql_dump(content: str) -> list[ParsedTable]:
                 end += 1
             body = block[start : end - 1]
 
-            pk_col = _extract_primary_key_from_body(body)
-            cols: list[ParsedColumn] = []
-            for line in body.split("\n"):
-                col = _parse_column_line(line)
-                if col:
-                    if pk_col and col.name == pk_col:
-                        col.is_primary_key = True
-                        col.nullable = False
-                        if col.pg_type in ("INTEGER", "BIGINT", "SMALLINT"):
-                            col.pg_type = "BIGSERIAL" if col.pg_type == "BIGINT" else "SERIAL"
-                    cols.append(col)
-
-            tables[tname] = ParsedTable(original_name=tname, columns=cols)
+            if tname in tables:
+                raise SQLImportValidationError(f"Duplicate CREATE TABLE for {tname}")
+            columns = _columns_from_create_body(body, limits)
+            tables[tname] = ParsedTable(original_name=tname, columns=columns)
+            if len(tables) > limits.max_tables:
+                raise SQLImportValidationError(
+                    f"SQL dump exceeds the {limits.max_tables}-table limit"
+                )
             continue
 
         # ── INSERT INTO ──────────────────────────────────────────
@@ -417,26 +518,65 @@ def parse_sql_dump(content: str) -> list[ParsedTable]:
                                     depth -= 1
                                 end_pos += 1
                             body = sub_block[start : end_pos - 1]
-                            pk_col = _extract_primary_key_from_body(body)
-                            cols = []
-                            for line in body.split("\n"):
-                                col = _parse_column_line(line)
-                                if col:
-                                    if pk_col and col.name == pk_col:
-                                        col.is_primary_key = True
-                                        col.nullable = False
-                                        if col.pg_type in ("INTEGER", "BIGINT", "SMALLINT"):
-                                            col.pg_type = "BIGSERIAL" if col.pg_type == "BIGINT" else "SERIAL"
-                                    cols.append(col)
-                            tables[tname] = ParsedTable(original_name=tname, columns=cols)
+                            columns = _columns_from_create_body(body, limits)
+                            tables[tname] = ParsedTable(
+                                original_name=tname,
+                                columns=columns,
+                            )
+                            if len(tables) > limits.max_tables:
+                                raise SQLImportValidationError(
+                                    f"SQL dump exceeds the {limits.max_tables}-table limit"
+                                )
                             break
             # VALUES: use the span right after this INSERT's column list, up to next ;
             values_start, values_end = _find_values_span(block, insert_match.end())
             values_str = block[values_start:values_end]
             rows = _parse_insert_values(values_str)
-            if tname in tables:
-                tables[tname].insert_values.extend(rows)
-                tables[tname].row_count += len(rows)
+            if tname not in tables:
+                raise SQLImportValidationError(
+                    f"INSERT references unknown table: {tname}"
+                )
+
+            insert_columns = [
+                column.strip().strip("`")
+                for column in insert_match.group(2).split(",")
+            ]
+            table_columns = [column.name for column in tables[tname].columns]
+            if (
+                not insert_columns
+                or len(set(insert_columns)) != len(insert_columns)
+                or not set(insert_columns).issubset(table_columns)
+            ):
+                raise SQLImportValidationError(
+                    f"INSERT has invalid columns for table: {tname}"
+                )
+
+            table_column_indexes = {
+                column_name: index
+                for index, column_name in enumerate(table_columns)
+            }
+            normalized_rows: list[list[str]] = []
+            for row in rows:
+                if len(row) != len(insert_columns):
+                    raise SQLImportValidationError(
+                        f"INSERT row width does not match columns for table: {tname}"
+                    )
+                if any(len(str(value)) > limits.max_cell_chars for value in row):
+                    raise SQLImportValidationError(
+                        f"INSERT value exceeds the {limits.max_cell_chars}-character cell limit"
+                    )
+                normalized = ["NULL"] * len(table_columns)
+                for index, column_name in enumerate(insert_columns):
+                    normalized[table_column_indexes[column_name]] = row[index]
+                normalized_rows.append(normalized)
+
+            total_rows += len(normalized_rows)
+            if total_rows > limits.max_total_rows:
+                raise SQLImportValidationError(
+                    f"SQL dump exceeds the {limits.max_total_rows}-row limit"
+                )
+            tables[tname].insert_values.extend(normalized_rows)
+            tables[tname].row_count += len(normalized_rows)
             continue
 
         # ── ALTER TABLE … ADD PRIMARY KEY ────────────────────────
@@ -481,17 +621,23 @@ def parse_sql_dump(content: str) -> list[ParsedTable]:
 
 # ── PostgreSQL SQL generation ────────────────────────────────────────
 
+def _quote_pg_identifier(identifier: str) -> str:
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,62}", identifier):
+        raise SQLImportValidationError("Unsafe PostgreSQL identifier")
+    return f'"{identifier}"'
+
+
 def build_pg_create_sql(table: ParsedTable, pg_table_name: str) -> str:
     """Generate a PostgreSQL CREATE TABLE statement."""
     col_parts: list[str] = []
     for col in table.columns:
         nullable = "" if col.nullable else " NOT NULL"
         if col.is_primary_key:
-            col_parts.append(f'"{col.name}" {col.pg_type} PRIMARY KEY')
+            col_parts.append(f"{_quote_pg_identifier(col.name)} {col.pg_type} PRIMARY KEY")
         else:
-            col_parts.append(f'"{col.name}" {col.pg_type}{nullable}')
+            col_parts.append(f"{_quote_pg_identifier(col.name)} {col.pg_type}{nullable}")
     cols_sql = ", ".join(col_parts)
-    return f'CREATE TABLE IF NOT EXISTS "{pg_table_name}" ({cols_sql})'
+    return f"CREATE TABLE IF NOT EXISTS {_quote_pg_identifier(pg_table_name)} ({cols_sql})"
 
 
 def build_pg_insert_sql(
@@ -518,9 +664,9 @@ def build_pg_insert_sql(
         pk_indices = set()
 
     col_names = [c.name for c in insert_cols]
-    col_list = ", ".join(f'"{c}"' for c in col_names)
+    col_list = ", ".join(_quote_pg_identifier(c) for c in col_names)
     placeholders = ", ".join(f":{c}" for c in col_names)
-    sql = f'INSERT INTO "{pg_table_name}" ({col_list}) VALUES ({placeholders})'
+    sql = f"INSERT INTO {_quote_pg_identifier(pg_table_name)} ({col_list}) VALUES ({placeholders})"
 
     records: list[dict] = []
     all_col_count = len(table.columns)

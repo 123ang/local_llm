@@ -6,9 +6,13 @@ const { chromium } = require("playwright");
 const FRONTEND_URL = "http://127.0.0.1:3000";
 const BACKEND_LOGIN_URL = "http://127.0.0.1:8000/api/auth/login";
 const COMPANIES_URL = "http://127.0.0.1:8000/api/companies";
-const OUTPUT_DIR = "/Users/123ang/andai-runtime/local_llm/manual_screenshots";
-const EMAIL = "admin@askai.local";
-const PASSWORD = "admin123";
+const OUTPUT_DIR = "/Users/123ang/andai-runtime/local_llm/docs/assets/manual_screenshots";
+const EMAIL = process.env.ASKAI_ADMIN_EMAIL;
+const PASSWORD = process.env.ASKAI_ADMIN_PASSWORD;
+
+if (!EMAIL || !PASSWORD) {
+  throw new Error("Set ASKAI_ADMIN_EMAIL and ASKAI_ADMIN_PASSWORD before capturing screenshots");
+}
 
 async function login() {
   const response = await fetch(BACKEND_LOGIN_URL, {

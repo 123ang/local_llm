@@ -1,6 +1,7 @@
 import logging
 import sys
 import re
+import os
 from pathlib import Path
 
 from app.core.probe_detection import is_suspicious_probe_path
@@ -19,16 +20,18 @@ security_logger.setLevel(logging.INFO)
 
 if not security_logger.handlers:
     # Separate destination for probe/security events.
-    security_log_path = Path("storage/security_events.log")
-    security_log_path.parent.mkdir(parents=True, exist_ok=True)
-
     security_stream = logging.StreamHandler(sys.stdout)
     security_stream.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
     security_logger.addHandler(security_stream)
 
-    security_file = logging.FileHandler(security_log_path, encoding="utf-8")
-    security_file.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
-    security_logger.addHandler(security_file)
+    security_log_path = Path(os.getenv("SECURITY_LOG_PATH", "storage/security_events.log"))
+    try:
+        security_log_path.parent.mkdir(parents=True, exist_ok=True)
+        security_file = logging.FileHandler(security_log_path, encoding="utf-8")
+        security_file.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s"))
+        security_logger.addHandler(security_file)
+    except OSError as exc:
+        security_logger.warning(f"Security file logging disabled: {exc}")
 
 
 class ProbeAccessFilter(logging.Filter):

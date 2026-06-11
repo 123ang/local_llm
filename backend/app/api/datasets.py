@@ -1,14 +1,25 @@
-import os
 import uuid
 import re
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import get_db, engine
+from app.core.database_roles import dataset_write_transaction, grant_text_to_sql_select
 from app.core.dependencies import require_admin, ensure_company_access, ensure_company_admin_access
+from app.core.errors import correlation_id_from_request, public_error_detail
+from app.core.logger import logger
 from app.core.security import get_current_user
 from app.core.config import settings
+from app.ingestion.sql_importer import (
+    SQLImportLimits,
+    SQLImportValidationError,
+    build_pg_create_sql,
+    build_pg_insert_sql,
+    make_unique_table_name,
+    parse_sql_dump,
+    read_sql_upload,
+)
 from app.schemas.dataset import DatasetCreateManual, DatasetOut, DatasetImportOut, CSVPreviewOut, SQLPreviewOut, SQLTablePreview
 from app.models.dataset import Dataset, DatasetImport
 from app.models.user import User
@@ -25,6 +36,20 @@ TYPE_MAP = {
     "date": "DATE",
     "timestamp": "TIMESTAMP",
 }
+
+
+def _sql_import_limits() -> SQLImportLimits:
+    return SQLImportLimits(
+        max_tables=settings.MAX_SQL_IMPORT_TABLES,
+        max_columns_per_table=settings.MAX_SQL_IMPORT_COLUMNS_PER_TABLE,
+        max_total_rows=settings.MAX_SQL_IMPORT_ROWS,
+    )
+
+
+def _safe_upload_name(filename: str) -> str:
+    basename = Path(filename).name
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "_", basename)
+    return cleaned[:200] or "upload.sql"
 
 def _safe_identifier(name: str) -> str:
     clean = re.sub(r'[^a-z0-9_]', '_', name.lower().strip())
@@ -78,8 +103,9 @@ async def create_manual_table(company_id: int, data: DatasetCreateManual, curren
     col_defs = ", ".join(cols)
     create_sql = f'CREATE TABLE IF NOT EXISTS {_quote_identifier(table_name)} (id SERIAL PRIMARY KEY, {col_defs})'
     
-    async with engine.begin() as conn:
+    async with dataset_write_transaction() as conn:
         await conn.execute(text(create_sql))
+        await grant_text_to_sql_select(conn, table_name)
     
     dataset = Dataset(
         company_id=company_id, table_name=table_name, display_name=data.display_name,
@@ -138,18 +164,16 @@ async def upload_table_and_data(
         schema_list.append({"name": safe_col, "type": col_type, "nullable": True, "original_name": col_name})
     
     create_sql = f'CREATE TABLE IF NOT EXISTS {_quote_identifier(table_name)} (id SERIAL PRIMARY KEY, {", ".join(col_defs)})'
-    async with engine.begin() as conn:
-        await conn.execute(text(create_sql))
-    
-    # Insert data
+
     row_count = 0
+    insert_sql = None
+    records = []
     if not df.empty:
         safe_cols = [s["name"] for s in schema_list]
         col_names = ", ".join(_quote_identifier(c) for c in safe_cols)
         placeholders = ", ".join(f":{c}" for c in safe_cols)
         insert_sql = f'INSERT INTO {_quote_identifier(table_name)} ({col_names}) VALUES ({placeholders})'
-        
-        records = []
+
         for _, row in df.iterrows():
             record = {}
             for i, s in enumerate(schema_list):
@@ -158,10 +182,13 @@ async def upload_table_and_data(
                 if s["type"] == "integer" and record[s["name"]] is not None:
                     record[s["name"]] = int(record[s["name"]])
             records.append(record)
-        
-        async with engine.begin() as conn:
-            await conn.execute(text(insert_sql), records)
         row_count = len(records)
+
+    async with dataset_write_transaction() as conn:
+        await conn.execute(text(create_sql))
+        if insert_sql and records:
+            await conn.execute(text(insert_sql), records)
+        await grant_text_to_sql_select(conn, table_name)
     
     dataset = Dataset(
         company_id=company_id, table_name=table_name, display_name=display_name,
@@ -215,10 +242,6 @@ async def upload_data_to_existing(
     
     df = pd.read_csv(file_path)
     
-    if mode == "replace":
-        async with engine.begin() as conn:
-            await conn.execute(text(f'DELETE FROM {_quote_identifier(dataset.table_name)}'))
-    
     schema = dataset.columns_schema or []
     safe_cols = [s["name"] for s in schema]
     col_names = ", ".join(_quote_identifier(c) for c in safe_cols)
@@ -236,11 +259,11 @@ async def upload_data_to_existing(
                 record[s["name"]] = int(record[s["name"]])
         records.append(record)
     
-    async with engine.begin() as conn:
-        await conn.execute(text(insert_sql), records)
-    
-    # Update row count
-    async with engine.begin() as conn:
+    async with dataset_write_transaction() as conn:
+        if mode == "replace":
+            await conn.execute(text(f'DELETE FROM {_quote_identifier(dataset.table_name)}'))
+        if records:
+            await conn.execute(text(insert_sql), records)
         count_result = await conn.execute(text(f'SELECT COUNT(*) FROM {_quote_identifier(dataset.table_name)}'))
         dataset.row_count = count_result.scalar()
     
@@ -284,7 +307,7 @@ async def get_dataset_rows(
     sql = f'SELECT id, {col_list} FROM {_quote_identifier(dataset.table_name)} ORDER BY id LIMIT :limit OFFSET :offset'
     count_sql = f'SELECT COUNT(*) FROM {_quote_identifier(dataset.table_name)}'
 
-    async with engine.begin() as conn:
+    async with engine.connect() as conn:
         rows_result = await conn.execute(text(sql), {"limit": limit, "offset": offset})
         rows = rows_result.fetchall()
         count_result = await conn.execute(text(count_sql))
@@ -323,6 +346,7 @@ async def _existing_table_names(company_id: int, db: AsyncSession) -> set[str]:
 @router.post("/{company_id}/preview-sql", response_model=SQLPreviewOut)
 async def preview_sql(
     company_id: int,
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
@@ -332,10 +356,27 @@ async def preview_sql(
     if not file.filename or not file.filename.lower().endswith(".sql"):
         raise HTTPException(status_code=400, detail="Only .sql files are allowed")
 
-    from app.ingestion.sql_importer import parse_sql_dump, make_unique_table_name
-
-    raw = (await file.read()).decode("utf-8", errors="replace")
-    parsed_tables = parse_sql_dump(raw)
+    try:
+        raw_bytes = await read_sql_upload(file, settings.MAX_SQL_UPLOAD_BYTES)
+        parsed_tables = parse_sql_dump(
+            raw_bytes.decode("utf-8", errors="replace"),
+            limits=_sql_import_limits(),
+        )
+    except SQLImportValidationError as exc:
+        correlation_id = correlation_id_from_request(request)
+        logger.warning(
+            "SQL preview rejected correlation_id=%s reason=%s",
+            correlation_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=public_error_detail(
+                request,
+                "The SQL file failed safety validation.",
+                exc,
+            ),
+        ) from exc
     if not parsed_tables:
         raise HTTPException(status_code=400, detail="No CREATE TABLE statements found in the SQL file")
 
@@ -371,6 +412,7 @@ async def preview_sql(
 @router.post("/{company_id}/upload-sql", status_code=201)
 async def upload_sql(
     company_id: int,
+    request: Request,
     file: UploadFile = File(...),
     display_name: str = Form(...),
     description: str = Form(""),
@@ -382,26 +424,38 @@ async def upload_sql(
     if not file.filename or not file.filename.lower().endswith(".sql"):
         raise HTTPException(status_code=400, detail="Only .sql files are allowed")
 
-    from app.ingestion.sql_importer import (
-        parse_sql_dump,
-        build_pg_create_sql,
-        build_pg_insert_sql,
-        make_unique_table_name,
-    )
-
     company_dir = Path(settings.UPLOAD_DIR) / "companies" / str(company_id) / "sql"
     company_dir.mkdir(parents=True, exist_ok=True)
-    safe_file = f"{uuid.uuid4().hex}_{file.filename}"
+    safe_file = f"{uuid.uuid4().hex}_{_safe_upload_name(file.filename)}"
     file_path = company_dir / safe_file
 
-    raw_bytes = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(raw_bytes)
+    try:
+        raw_bytes = await read_sql_upload(file, settings.MAX_SQL_UPLOAD_BYTES)
+        parsed_tables = parse_sql_dump(
+            raw_bytes.decode("utf-8", errors="replace"),
+            limits=_sql_import_limits(),
+        )
+    except SQLImportValidationError as exc:
+        correlation_id = correlation_id_from_request(request)
+        logger.warning(
+            "SQL import rejected correlation_id=%s reason=%s",
+            correlation_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=public_error_detail(
+                request,
+                "The SQL file failed safety validation.",
+                exc,
+            ),
+        ) from exc
 
-    raw = raw_bytes.decode("utf-8", errors="replace")
-    parsed_tables = parse_sql_dump(raw)
     if not parsed_tables:
         raise HTTPException(status_code=400, detail="No CREATE TABLE statements found in the SQL file")
+
+    with open(file_path, "wb") as f:
+        f.write(raw_bytes)
 
     existing = await _existing_table_names(company_id, db)
     used_names: set[str] = set(existing)
@@ -415,24 +469,28 @@ async def upload_sql(
 
         try:
             create_sql = build_pg_create_sql(pt, pg_name)
-            async with engine.begin() as conn:
+            insert_sql, records = build_pg_insert_sql(pt, pg_name)
+            async with dataset_write_transaction() as conn:
                 await conn.execute(text(create_sql))
-        except Exception as e:
-            errors.append({"table": pt.original_name, "step": "create_table", "error": str(e)})
-            continue
-
-        row_count = 0
-        if pt.insert_values:
-            try:
-                insert_sql, records = build_pg_insert_sql(pt, pg_name)
                 if records:
                     batch_size = 500
-                    async with engine.begin() as conn:
-                        for i in range(0, len(records), batch_size):
-                            await conn.execute(text(insert_sql), records[i : i + batch_size])
-                    row_count = len(records)
-            except Exception as e:
-                errors.append({"table": pt.original_name, "step": "insert_data", "error": str(e)})
+                    for i in range(0, len(records), batch_size):
+                        await conn.execute(text(insert_sql), records[i : i + batch_size])
+                await grant_text_to_sql_select(conn, pg_name)
+            row_count = len(records)
+        except Exception as exc:
+            correlation_id = correlation_id_from_request(request)
+            logger.exception(
+                "SQL table import failed correlation_id=%s table=%s",
+                correlation_id,
+                pt.original_name,
+            )
+            errors.append({
+                "table": pt.original_name,
+                "step": "import_table",
+                "correlation_id": correlation_id,
+            })
+            continue
 
         table_display = f"{display_name} — {pt.original_name}" if len(parsed_tables) > 1 else display_name
         schema_list = [
@@ -461,12 +519,8 @@ async def upload_sql(
             file_path=str(file_path),
             row_count=row_count,
             mode="replace",
-            status="completed" if not any(
-                e["table"] == pt.original_name for e in errors
-            ) else "error",
-            error_message=next(
-                (e["error"] for e in errors if e["table"] == pt.original_name), None
-            ),
+            status="completed",
+            error_message=None,
             imported_by=current_user.id,
         )
         db.add(imp)
@@ -492,7 +546,10 @@ async def upload_sql(
     if not created and errors:
         raise HTTPException(
             status_code=400,
-            detail=f"Failed to import any table. Errors: {errors}",
+            detail=public_error_detail(
+                request,
+                "Failed to import any table. Contact an administrator with the correlation ID.",
+            ),
         )
 
     return {

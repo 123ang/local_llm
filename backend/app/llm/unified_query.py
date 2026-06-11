@@ -1,14 +1,57 @@
 import re
 
+import sqlglot
+from sqlglot import exp
+from sqlglot.errors import ParseError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
-from app.core.database import engine
+from app.core.database import text_to_sql_engine
 from app.core.logger import logger
 from app.models.faq import FAQItem
 from app.models.document import Document, DocumentChunk
 from app.models.dataset import Dataset
 
-SQL_TABLE_REF_RE = re.compile(r'\b(?:from|join)\s+((?:"?[a-zA-Z_][\w$]*"?\.)?"?[a-zA-Z_][\w$]*"?)', re.IGNORECASE)
+SQL_DANGEROUS_FUNCTIONS = {
+    "current_setting",
+    "dblink",
+    "dblink_exec",
+    "lo_export",
+    "lo_import",
+    "pg_advisory_lock",
+    "pg_advisory_xact_lock",
+    "pg_ls_dir",
+    "pg_read_binary_file",
+    "pg_read_file",
+    "pg_sleep",
+    "pg_stat_file",
+    "set_config",
+}
+SQL_FORBIDDEN_NODES = tuple(
+    node_type
+    for node_type in (
+        getattr(exp, name, None)
+        for name in (
+            "Alter",
+            "Command",
+            "Copy",
+            "Create",
+            "Delete",
+            "Drop",
+            "Grant",
+            "Insert",
+            "Into",
+            "Lock",
+            "Merge",
+            "Set",
+            "Transaction",
+            "TruncateTable",
+            "Update",
+            "Use",
+        )
+    )
+    if node_type is not None
+)
+SQL_QUERY_ROOTS = (exp.Select, exp.Union, exp.Intersect, exp.Except)
 
 STOPWORDS = {
     "what", "which", "where", "when", "who", "how", "why", "does", "did",
@@ -68,13 +111,16 @@ async def unified_query(
     # 3. Structured data (Text-to-SQL)
     if company_id and "database" in active:
         sql_result = await _query_structured_data(db, company_id, question)
-        if sql_result and sql_result.get("row_count", 0) > 0:
+        if sql_result:
+            sources["database"] = sql_result
+        if sql_result and (sql_result.get("blocked") or sql_result.get("error")):
+            db_evidence.append(f"[Database query blocked]\n{sql_result.get('result', 'The structured data query was blocked by safety rules.')}")
+        elif sql_result and sql_result.get("row_count", 0) > 0:
             if isinstance(sql_result["result"], list) and sql_result["result"]:
                 rows_text = _format_rows_for_llm(sql_result["result"])
                 db_evidence.append(f"[Database query result — {sql_result['row_count']} rows returned]\n{rows_text}")
             elif isinstance(sql_result["result"], str) and "error" not in sql_result["result"].lower():
                 db_evidence.append(f"[Database] {sql_result['result']}")
-            sources["database"] = sql_result
 
     # Deterministic formatting for key Kedah Investment demo questions.
     # Avoids bullet-list answers when the user specifically needs a table.
@@ -285,16 +331,91 @@ def _source_only_refusal(active_sources: set[str]) -> str:
 
 
 def _extract_sql_table_refs(sql: str) -> set[str]:
-    refs: set[str] = set()
-    for match in SQL_TABLE_REF_RE.finditer(sql):
-        ref = match.group(1).split(".")[-1].strip('"')
-        refs.add(ref)
-    return refs
+    statement = _parse_single_select(sql)
+    if statement is None:
+        return set()
+
+    cte_names = {
+        cte.alias_or_name.casefold()
+        for cte in statement.find_all(exp.CTE)
+        if cte.alias_or_name
+    }
+    return {
+        table.name
+        for table in statement.find_all(exp.Table)
+        if table.name and table.name.casefold() not in cte_names
+    }
 
 
 def _sql_uses_only_allowed_tables(sql: str, allowed_tables: set[str]) -> bool:
+    if not _is_safe_select_sql(sql):
+        return False
     refs = _extract_sql_table_refs(sql)
-    return bool(refs) and refs.issubset(allowed_tables)
+    normalized_allowed = {table.casefold() for table in allowed_tables}
+    return bool(refs) and {table.casefold() for table in refs}.issubset(normalized_allowed)
+
+
+def _sanitize_generated_sql(sql: str) -> str | None:
+    cleaned = (sql or "").strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:sql)?", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = cleaned.removesuffix("```").strip()
+    if cleaned.lower().startswith("sql"):
+        cleaned = cleaned[3:].strip()
+    cleaned = _strip_sql_comments(cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if cleaned.endswith(";"):
+        cleaned = cleaned[:-1].strip()
+    if not cleaned:
+        return None
+    return cleaned
+
+
+def _is_safe_select_sql(sql: str) -> bool:
+    return _parse_single_select(sql) is not None
+
+
+def _parse_single_select(sql: str):
+    cleaned = _sanitize_generated_sql(sql)
+    if not cleaned:
+        return None
+    try:
+        statements = sqlglot.parse(cleaned, read="postgres")
+    except ParseError:
+        return None
+    if len(statements) != 1 or not isinstance(statements[0], SQL_QUERY_ROOTS):
+        return None
+
+    statement = statements[0]
+    if any(statement.find(node_type) is not None for node_type in SQL_FORBIDDEN_NODES):
+        return None
+    for table in statement.find_all(exp.Table):
+        if table.db or table.catalog:
+            return None
+    for function in statement.find_all(exp.Func):
+        function_name = (getattr(function, "name", "") or "").casefold()
+        if function_name in SQL_DANGEROUS_FUNCTIONS:
+            return None
+    return statement
+
+
+def _strip_sql_comments(sql: str) -> str:
+    sql = re.sub(r"--[^\n\r]*", " ", sql)
+    sql = re.sub(r"/\*.*?\*/", " ", sql, flags=re.DOTALL)
+    return sql
+
+
+async def _execute_readonly_query(sql: str, params: dict | None = None, fetch_limit: int = 50) -> tuple[list[str], list[dict]]:
+    if text_to_sql_engine is None:
+        raise RuntimeError("TEXT_TO_SQL_DATABASE_URL is not configured")
+    async with text_to_sql_engine.connect() as conn:
+        async with conn.begin():
+            await conn.execute(text("SET TRANSACTION READ ONLY"))
+            await conn.execute(text("SET LOCAL statement_timeout = '5000ms'"))
+            res = await conn.execute(text(sql), params or {})
+            rows = res.fetchmany(fetch_limit)
+            columns = list(res.keys())
+            return columns, [dict(zip(columns, row)) for row in rows]
 
 
 def _format_rows_for_llm(rows: list[dict], max_rows: int = 30) -> str:
@@ -502,28 +623,20 @@ async def _query_structured_data(db: AsyncSession, company_id: int, question: st
                 "total_investment_rm_million, jobs_per_rm1b, "
                 "'Sector ratio = total_employment / (total_investment_rm_million / 1000). 2025 values normalized from RM to RM million.' AS methodology_note "
                 "FROM (SELECT sector, total_employment, total_investment_rm_million, jobs_per_rm1b FROM kedah_sector_jobs_per_rm1b "
-                f"ORDER BY jobs_per_rm1b {order_dir} LIMIT {sector_limit}) s "
+                f"ORDER BY jobs_per_rm1b {order_dir} LIMIT :sector_limit) s "
                 "ORDER BY scope, jobs_per_rm1b DESC"
             )
-            async with engine.begin() as conn:
-                res = await conn.execute(text(sql))
-                rows = res.fetchmany(50)
-                columns = list(res.keys())
-                data = [dict(zip(columns, row)) for row in rows]
-                table_refs = sorted(_extract_sql_table_refs(sql))
-                return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
+            columns, data = await _execute_readonly_query(sql, {"sector_limit": sector_limit})
+            table_refs = sorted(_extract_sql_table_refs(sql))
+            return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
         if wants_rm1b_jobs:
             sql = (
                 'SELECT total_employment, total_investment_rm_million, jobs_per_rm1b, first_year, latest_year, methodology_note '
                 'FROM kedah_overall_jobs_per_rm1b_trend LIMIT 1'
             )
-            async with engine.begin() as conn:
-                res = await conn.execute(text(sql))
-                rows = res.fetchmany(50)
-                columns = list(res.keys())
-                data = [dict(zip(columns, row)) for row in rows]
-                table_refs = sorted(_extract_sql_table_refs(sql))
-                return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
+            columns, data = await _execute_readonly_query(sql)
+            table_refs = sorted(_extract_sql_table_refs(sql))
+            return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
 
     # Optional hint for common UUM-style tables so the LLM maps questions to the right columns
     table_hint = ""
@@ -551,36 +664,32 @@ Q: "{question}"
 Return ONLY a SELECT query (double-quote identifiers, LIMIT 100) or NONE."""
 
         sql = await generate(sql_prompt, system="PostgreSQL expert. Return only SQL, no explanation.", max_tokens=150, fast=True)
-        sql = sql.strip()
-        if sql.startswith("```"):
-            sql = sql.strip("`").strip()
-        if sql.lower().startswith("sql"):
-            sql = sql[3:].strip()
-        # Models often emit "SELECT ...;\nLIMIT 100" — the semicolon ends the first statement and breaks Postgres.
-        sql = re.sub(r";\s*\r?\n\s*", " ", sql)
-        sql = re.sub(r"\s+", " ", sql).strip()
-        sql = sql.rstrip(";`").strip()
-
-        if not sql or sql.upper().strip() == "NONE" or not sql.upper().lstrip().startswith("SELECT"):
+        sql = _sanitize_generated_sql(sql) or ""
+        if not sql or sql.upper().strip() == "NONE" or not _is_safe_select_sql(sql):
             return None
 
         allowed_tables = {ds.table_name for ds in datasets}
         if not _sql_uses_only_allowed_tables(sql, allowed_tables):
             logger.warning(f"Rejected SQL outside company dataset allowlist: {sql}")
-            return None
+            return {
+                "sql": None,
+                "result": "Structured data query was blocked by safety rules. Please narrow the question to this company's uploaded datasets.",
+                "row_count": 0,
+                "blocked": True,
+            }
 
         try:
-            async with engine.begin() as conn:
-                res = await conn.execute(text(sql))
-                rows = res.fetchmany(50)
-                columns = list(res.keys())
-                data = [dict(zip(columns, row)) for row in rows]
-                table_refs = sorted(_extract_sql_table_refs(sql))
-                return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
+            columns, data = await _execute_readonly_query(sql)
+            table_refs = sorted(_extract_sql_table_refs(sql))
+            return {"sql": sql, "result": data, "row_count": len(data), "tables": table_refs, "datasets": [dataset_names_by_table.get(t, t) for t in table_refs]}
         except Exception as e:
             logger.warning(f"SQL execution failed: {e} | SQL: {sql}")
-            # Don't crash — return empty so the LLM can still answer from other sources
-            return None
+            return {
+                "sql": None,
+                "result": "Structured data query could not be completed safely. Please try again or contact an administrator.",
+                "row_count": 0,
+                "error": True,
+            }
 
     except ConnectionError:
         return None

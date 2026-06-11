@@ -7,6 +7,8 @@ Full PDF processing pipeline:
   5. Update Document status to 'ready'
 """
 
+import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import async_session
@@ -120,8 +122,13 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
 
         logger.info(f"Document {document_id} processed: {len(chunk_objs)} chunks, {doc.page_count} pages")
 
-    except Exception as e:
-        logger.error(f"Document {document_id} processing failed: {e}", exc_info=True)
+    except Exception:
+        correlation_id = str(uuid.uuid4())
+        logger.exception(
+            "Document %s processing failed correlation_id=%s",
+            document_id,
+            correlation_id,
+        )
         doc.status = "error"
-        doc.error_message = str(e)
+        doc.error_message = f"Document processing failed. Reference: {correlation_id}"
         await db.commit()

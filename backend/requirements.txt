@@ -1,16 +1,19 @@
 # Web framework
-fastapi==0.115.6
+fastapi==0.136.3
 uvicorn[standard]==0.34.0
-python-multipart==0.0.20
+python-multipart==0.0.27
 
 # Database
 sqlalchemy[asyncio]==2.0.41
 asyncpg==0.30.0
 psycopg2-binary==2.9.11
 alembic==1.18.4
+sqlglot==30.10.0
 
 # Auth
-python-jose[cryptography]==3.4.0
+python-jose[cryptography]==3.5.0
+pyasn1==0.6.3
+PyJWT==2.13.0
 passlib[bcrypt]==1.7.4
 # passlib 1.7.4 reads bcrypt.__about__; removed in bcrypt 4.1+
 bcrypt>=4.0.1,<4.1.0
@@ -18,7 +21,7 @@ bcrypt>=4.0.1,<4.1.0
 # Settings
 pydantic[email]==2.11.7
 pydantic-settings==2.9.1
-python-dotenv==1.1.0
+python-dotenv==1.2.2
 
 # HTTP
 httpx==0.28.1
@@ -31,17 +34,11 @@ openpyxl==3.1.5
 # PDF processing
 pymupdf==1.25.4
 
-# LLM & RAG
-langchain==0.3.25
-langchain-community==0.3.24
-langchain-ollama==0.3.2
-langchain-text-splitters==0.3.8
-
 # Vector search uses PostgreSQL pgvector extension (installed at DB level)
 
 # Background jobs
 celery==5.5.2
-redis==5.3.0
+redis==5.3.1
 
 # Utilities
 python-dateutil==2.9.0.post0

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -6,15 +6,27 @@ from app.schemas.auth import LoginRequest, TokenResponse, UserBrief
 from app.services.auth_service import authenticate_user, create_token_for_user
 from app.services.audit_service import log_action
 from app.core.security import get_current_user
+from app.core.rate_limit import login_rate_limiter, login_rate_limit_key
 from app.models.user import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=TokenResponse)
-async def login(form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+async def login(request: Request, form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    rate_key = login_rate_limit_key(request, form.username)
+    retry_after = login_rate_limiter.retry_after(rate_key)
+    if retry_after:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many login attempts. Please try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     user = await authenticate_user(db, form.username, form.password)
     if not user:
+        login_rate_limiter.record_failure(rate_key)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    login_rate_limiter.record_success(rate_key)
     token_data = await create_token_for_user(user)
     await log_action(db, action="login", user_id=user.id, company_id=user.company_id)
     company_name = None

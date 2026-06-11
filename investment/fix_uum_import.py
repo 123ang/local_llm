@@ -1,5 +1,6 @@
 """Fix and re-import UUM SQL data with type conversion."""
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +29,18 @@ def _safe_table_name(company_id: int, name: str) -> str:
     return f"c{company_id}_{clean}"
 
 
+def get_uum_sql_path() -> Path:
+    raw_path = os.environ.get("UUM_SQL_DUMP_PATH")
+    if not raw_path:
+        raise RuntimeError(
+            "Set UUM_SQL_DUMP_PATH to an external SQL dump before importing UUM data"
+        )
+    sql_file = Path(raw_path).expanduser().resolve()
+    if not sql_file.is_file():
+        raise RuntimeError(f"UUM_SQL_DUMP_PATH is not a file: {sql_file}")
+    return sql_file
+
+
 async def get_existing_table_names(company_id: int, db: AsyncSession) -> set[str]:
     """Get all existing table names for a company."""
     result = await db.execute(
@@ -38,6 +51,8 @@ async def get_existing_table_names(company_id: int, db: AsyncSession) -> set[str
 
 async def fix_uum_import():
     """Re-import UUM SQL with proper type conversion."""
+    sql_file = get_uum_sql_path()
+
     print("=" * 60)
     print("Fixing UUM SQL Import")
     print("=" * 60)
@@ -82,12 +97,6 @@ async def fix_uum_import():
             await db.delete(ds)
         await db.commit()
         print("  Cleared existing datasets")
-        
-        # Load SQL file
-        sql_file = Path(__file__).parent.parent / "uum_db.sql"
-        if not sql_file.exists():
-            print(f"[ERROR] {sql_file} not found!")
-            return
         
         print(f"Reading SQL file: {sql_file}")
         with open(sql_file, "r", encoding="utf-8", errors="replace") as f:
@@ -230,7 +239,7 @@ async def fix_uum_import():
                     company_id=company.id,
                     table_name=pg_name,
                     display_name=pt.original_name,
-                    description=f"Imported from uum_db.sql",
+                    description=f"Imported from {sql_file.name}",
                     columns_schema=schema_list,
                     row_count=row_count,
                     source="sql_upload",
@@ -244,7 +253,7 @@ async def fix_uum_import():
                 imp = DatasetImport(
                     dataset_id=dataset.id,
                     company_id=company.id,
-                    filename="uum_db.sql",
+                    filename=sql_file.name,
                     file_path=str(sql_file),
                     row_count=row_count,
                     mode="replace",

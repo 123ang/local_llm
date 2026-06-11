@@ -183,7 +183,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="20dp"
                     android:gravity="center"
-                    android:text="Default: admin@askai.local / admin123"
+                    android:text="Credentials are provided by your administrator"
                     android:textColor="#64748B"
                     android:textSize="11sp" />
             </LinearLayout>

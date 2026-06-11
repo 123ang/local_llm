@@ -1,9 +1,10 @@
 """
 Script to create two companies and load their data:
-1. UUM - loads uum_db.sql
+1. UUM - loads the external SQL dump configured by UUM_SQL_DUMP_PATH
 2. Kedah Investment - loads investment CSV (after processing)
 """
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -32,6 +33,18 @@ from datetime import datetime, date
 def _safe_table_name(company_id: int, name: str) -> str:
     clean = re.sub(r'[^a-z0-9_]', '_', name.lower().strip())
     return f"c{company_id}_{clean}"
+
+
+def get_uum_sql_path() -> Path:
+    raw_path = os.environ.get("UUM_SQL_DUMP_PATH")
+    if not raw_path:
+        raise RuntimeError(
+            "Set UUM_SQL_DUMP_PATH to an external SQL dump before importing UUM data"
+        )
+    sql_file = Path(raw_path).expanduser().resolve()
+    if not sql_file.is_file():
+        raise RuntimeError(f"UUM_SQL_DUMP_PATH is not a file: {sql_file}")
+    return sql_file
 
 
 async def get_existing_table_names(company_id: int, db: AsyncSession) -> set[str]:
@@ -76,13 +89,9 @@ async def create_companies(db: AsyncSession):
 
 
 async def load_uum_sql(company: Company, db: AsyncSession):
-    """Load uum_db.sql into the UUM company."""
-    print(f"\nLoading uum_db.sql for company: {company.name}...")
-    
-    sql_file = Path(__file__).parent.parent / "uum_db.sql"
-    if not sql_file.exists():
-        print(f"[ERROR] {sql_file} not found!")
-        return
+    """Load an external SQL dump into the UUM company."""
+    sql_file = get_uum_sql_path()
+    print(f"\nLoading {sql_file.name} for company: {company.name}...")
     
     print(f"Reading SQL file: {sql_file}")
     with open(sql_file, "r", encoding="utf-8", errors="replace") as f:
@@ -217,7 +226,7 @@ async def load_uum_sql(company: Company, db: AsyncSession):
                 company_id=company.id,
                 table_name=pg_name,
                 display_name=pt.original_name,
-                description=f"Imported from uum_db.sql",
+                description=f"Imported from {sql_file.name}",
                 columns_schema=schema_list,
                 row_count=row_count,
                 source="sql_upload",
@@ -231,7 +240,7 @@ async def load_uum_sql(company: Company, db: AsyncSession):
             imp = DatasetImport(
                 dataset_id=dataset.id,
                 company_id=company.id,
-                filename="uum_db.sql",
+                filename=sql_file.name,
                 file_path=str(sql_file),
                 row_count=row_count,
                 mode="replace",
