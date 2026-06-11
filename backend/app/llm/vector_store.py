@@ -51,13 +51,15 @@ async def update_document_chunk_vectors(db: AsyncSession, chunk_ids: list[int]) 
     ids = [int(i) for i in chunk_ids if i is not None]
     if not ids:
         return 0
-    id_list = ",".join(str(i) for i in ids)
-    result = await db.execute(text(
-        "UPDATE document_chunks "
-        "SET embedding_vector = embedding::text::vector "
-        f"WHERE id IN ({id_list}) AND embedding IS NOT NULL "
-        "RETURNING id"
-    ))
+    result = await db.execute(
+        text(
+            "UPDATE document_chunks "
+            "SET embedding_vector = embedding::text::vector "
+            "WHERE id = ANY(:ids) AND embedding IS NOT NULL "
+            "RETURNING id"
+        ),
+        {"ids": ids},
+    )
     return len(result.fetchall())
 
 

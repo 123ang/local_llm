@@ -205,7 +205,7 @@ Answer using only the source evidence above. If the evidence does not contain th
             return {"answer": "[AI offline — showing source evidence]\n\n" + "\n\n".join(strict_evidence), "sources": sources, "model_tier": "instant"}
         except Exception as llm_err:
             logger.error(f"Source-only generation error: {llm_err}")
-            return {"answer": "[AI error — showing source evidence]\n\n" + "\n\n".join(strict_evidence), "sources": sources, "model_tier": "instant"}
+            return {"answer": "The AI service encountered an error. Displaying source evidence directly:\n\n" + "\n\n".join(strict_evidence), "sources": sources, "model_tier": "instant"}
 
     # 5. Generate answer using LLM — AI Insights may use general knowledge only when no sources match.
     has_evidence = bool(evidence)
@@ -247,14 +247,14 @@ Answer from general knowledge. If relevant tables exist above, suggest how to re
     except ConnectionError:
         if evidence:
             combined = "\n\n".join(evidence)
-            return {"answer": f"[LLM offline — showing raw results]\n\n{combined}", "sources": sources, "model_tier": "instant"}
+            return {"answer": f"The AI service is currently offline. Displaying source data directly:\n\n{combined}", "sources": sources, "model_tier": "instant"}
         return {"answer": "The AI service is currently offline. Please try again later.", "sources": sources, "model_tier": "instant"}
     except Exception as llm_err:
         logger.error(f"LLM generation error: {llm_err}")
         if evidence:
             combined = "\n\n".join(evidence)
-            return {"answer": f"[LLM error — showing raw results]\n\n{combined}", "sources": sources, "model_tier": "instant"}
-        return {"answer": f"An error occurred while generating the answer. Please try again.", "sources": sources, "model_tier": "instant"}
+            return {"answer": f"The AI service encountered an error. Displaying source data directly:\n\n{combined}", "sources": sources, "model_tier": "instant"}
+        return {"answer": "An error occurred while generating the answer. Please try again.", "sources": sources, "model_tier": "instant"}
 
 
 def _format_kedah_sector_jobs_table(rows: list[dict], max_rows: int = 30) -> str:
@@ -532,40 +532,47 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
     except Exception as emb_err:
         logger.warning(f"Embedding/vector search failed — keyword fallback: {emb_err}")
 
-    # Keyword fallback
-    result = await db.execute(
-        select(DocumentChunk)
-        .join(Document, DocumentChunk.document_id == Document.id)
-        .where(DocumentChunk.company_id == company_id, Document.status == "ready")
-    )
-    chunks = result.scalars().all()
-    if not chunks:
-        return []
-
+    # Keyword fallback using PostgreSQL full-text search (avoids loading all chunks into Python)
     q_lower = question.lower()
     keywords = [w for w in q_lower.split() if len(w) > 2 and w not in STOPWORDS]
     if not keywords:
         return []
 
-    scored_kw = []
-    for chunk in chunks:
-        score = sum(1 for kw in keywords if kw in chunk.content.lower())
-        if score > 0:
-            scored_kw.append((score, chunk))
+    try:
+        fts_result = await db.execute(
+            text(
+                "SELECT dc.id, dc.content, dc.page_number, dc.document_id, dc.company_id, "
+                "ts_rank(to_tsvector('simple', dc.content), plainto_tsquery('simple', :query)) AS rank "
+                "FROM document_chunks dc "
+                "JOIN documents d ON d.id = dc.document_id "
+                "WHERE dc.company_id = :company_id AND d.status = 'ready' "
+                "AND to_tsvector('simple', dc.content) @@ plainto_tsquery('simple', :query) "
+                "ORDER BY rank DESC LIMIT 5"
+            ),
+            {"company_id": int(company_id), "query": " ".join(keywords)},
+        )
+        rows = fts_result.mappings().all()
+    except Exception as fts_err:
+        logger.warning(f"FTS keyword fallback failed: {fts_err}")
+        return []
 
-    scored_kw.sort(key=lambda x: x[0], reverse=True)
+    if not rows:
+        return []
+
+    doc_ids = list({row["document_id"] for row in rows})
+    doc_result = await db.execute(select(Document).where(Document.id.in_(doc_ids)))
+    docs_by_id = {doc.id: doc for doc in doc_result.scalars().all()}
+
     results = []
-    for score, chunk in scored_kw[:5]:
-        doc_result = await db.execute(select(Document).where(Document.id == chunk.document_id))
-        doc = doc_result.scalar_one_or_none()
-        doc_name = doc.original_name if doc else f"doc_{chunk.document_id}"
+    for row in rows:
+        doc = docs_by_id.get(row["document_id"])
         results.append({
-            "content": chunk.content[:600],
-            "source": doc_name,
-            "document_id": doc.id if doc else chunk.document_id,
-            "company_id": doc.company_id if doc else chunk.company_id,
-            "page": chunk.page_number,
-            "score": score,
+            "content": row["content"][:600],
+            "source": doc.original_name if doc else f"doc_{row['document_id']}",
+            "document_id": doc.id if doc else row["document_id"],
+            "company_id": doc.company_id if doc else row["company_id"],
+            "page": row["page_number"],
+            "score": int(round(float(row["rank"]) * 10)) or 1,
         })
     return results
 

@@ -265,7 +265,7 @@ async def upload_data_to_existing(
         if records:
             await conn.execute(text(insert_sql), records)
         count_result = await conn.execute(text(f'SELECT COUNT(*) FROM {_quote_identifier(dataset.table_name)}'))
-        dataset.row_count = count_result.scalar()
+        dataset.row_count = count_result.scalar() or 0
     
     imp = DatasetImport(
         dataset_id=dataset.id, company_id=company_id, filename=file.filename,

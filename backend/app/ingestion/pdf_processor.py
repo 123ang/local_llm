@@ -7,6 +7,7 @@ Full PDF processing pipeline:
   5. Update Document status to 'ready'
 """
 
+import asyncio
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,8 +43,8 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
     await db.commit()
 
     try:
-        # 1. Extract text pages
-        pages = extract_text_from_pdf(doc.file_path)
+        # 1. Extract text pages (run sync PDF parser in thread to avoid blocking the event loop)
+        pages = await asyncio.to_thread(extract_text_from_pdf, doc.file_path)
         if not pages:
             doc.status = "error"
             doc.error_message = "No text could be extracted from this PDF."
@@ -81,11 +82,13 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
 
         # 4. Embed and save each chunk
         chunk_objs = []
+        failed_embeddings = 0
         for idx, chunk_data in enumerate(all_chunks):
             try:
                 embedding = await get_embedding(chunk_data["content"])
-            except ConnectionError:
-                logger.warning(f"Ollama not available — saving chunk {idx} without embedding")
+            except (ConnectionError, Exception) as emb_err:
+                logger.warning(f"Document {document_id}: embedding failed for chunk {idx}: {emb_err}")
+                failed_embeddings += 1
                 embedding = None
 
             chunk_obj = DocumentChunk(
@@ -117,7 +120,13 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
         # 5. Update document status
         doc.chunk_count = len(chunk_objs)
         doc.status = "ready"
-        doc.error_message = None
+        if failed_embeddings:
+            doc.error_message = (
+                f"{failed_embeddings}/{len(all_chunks)} chunks could not be embedded "
+                "(embedding service unavailable). Search coverage may be incomplete."
+            )
+        else:
+            doc.error_message = None
         await db.commit()
 
         logger.info(f"Document {document_id} processed: {len(chunk_objs)} chunks, {doc.page_count} pages")

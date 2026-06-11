@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 from app.core.config import settings
 from app.core.logger import logger
@@ -49,16 +51,27 @@ async def generate(
         },
     }
 
-    try:
-        resp = await _get_client().post("/api/chat", json=payload)
-        resp.raise_for_status()
-        return resp.json().get("message", {}).get("content", "")
-    except httpx.ConnectError:
-        logger.warning("Ollama not reachable")
-        raise ConnectionError("Ollama is not running. Please start Ollama and try again.")
-    except Exception as e:
-        logger.error(f"Ollama error: {e}")
-        raise
+    last_err: Exception | None = None
+    for attempt in range(3):
+        try:
+            resp = await _get_client().post("/api/chat", json=payload)
+            resp.raise_for_status()
+            return resp.json().get("message", {}).get("content", "")
+        except httpx.ConnectError:
+            logger.warning("Ollama not reachable")
+            raise ConnectionError("Ollama is not running. Please start Ollama and try again.")
+        except httpx.TimeoutException as e:
+            last_err = e
+            if attempt < 2:
+                await asyncio.sleep(2 ** attempt)
+                logger.warning(f"Ollama request timed out (attempt {attempt + 1}/3), retrying...")
+                continue
+            logger.error("Ollama request timed out after 3 attempts")
+            raise
+        except Exception as e:
+            logger.error(f"Ollama error: {e}")
+            raise
+    raise last_err  # type: ignore[misc]
 
 
 async def embed(texts: list[str], model: str | None = None) -> list[list[float]]:

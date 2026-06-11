@@ -118,11 +118,19 @@ async def list_sessions(company_id: int | None = None, current_user: User = Depe
         query = query.where(ChatSession.company_id == company_id)
     result = await db.execute(query.order_by(ChatSession.updated_at.desc()))
     sessions = result.scalars().all()
-    out = []
-    for s in sessions:
-        count_result = await db.execute(select(func.count(ChatMessage.id)).where(ChatMessage.session_id == s.id))
-        out.append(ChatSessionOut(id=s.id, title=s.title, created_at=s.created_at, message_count=count_result.scalar() or 0))
-    return out
+    if not sessions:
+        return []
+    session_ids = [s.id for s in sessions]
+    counts_result = await db.execute(
+        select(ChatMessage.session_id, func.count(ChatMessage.id).label("cnt"))
+        .where(ChatMessage.session_id.in_(session_ids))
+        .group_by(ChatMessage.session_id)
+    )
+    counts = {row.session_id: row.cnt for row in counts_result.all()}
+    return [
+        ChatSessionOut(id=s.id, title=s.title, created_at=s.created_at, message_count=counts.get(s.id, 0))
+        for s in sessions
+    ]
 
 @router.get("/sessions/{session_id}/messages", response_model=list[ChatMessageOut])
 async def get_messages(session_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
@@ -153,7 +161,7 @@ async def ask_question(
             raise HTTPException(status_code=404, detail="Session not found")
         ensure_company_access(current_user, session.company_id)
         if data.company_id is not None and data.company_id != session.company_id:
-            raise HTTPException(status_code=400, detail="Session belongs to a different company")
+            raise HTTPException(status_code=403, detail="Session belongs to a different company")
         requested_company_id = session.company_id
     else:
         company_id = requested_company_id or 0
