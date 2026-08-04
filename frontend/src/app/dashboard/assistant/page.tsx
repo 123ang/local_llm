@@ -4,6 +4,7 @@ import { Send, Plus, Trash2, Bot, User, Database, FileText, HelpCircle, Loader2,
 import { DatabaseResultTable, ExecutiveAnswerCard, SourceBadges } from "./components/MessageRenderers";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
+import { useAuth } from "@/lib/auth-context";
 
 const SOURCE_OPTIONS = [
   { key: "database", label: "Database", icon: Database, color: "emerald" },
@@ -11,11 +12,13 @@ const SOURCE_OPTIONS = [
   { key: "faq", label: "FAQ", icon: HelpCircle, color: "amber" },
 ] as const;
 
-interface Session { id: number; title: string | null; created_at: string; message_count: number; }
+interface Session { id: number; title: string | null; department_ids?: number[]; created_at: string; message_count: number; }
 interface Message { id: number; role: string; content: string; sources: any; sql_generated: string | null; created_at: string; model_tier?: string; response_time_ms?: number; }
 
 export default function AssistantPage() {
   const companyId = useCompanyId();
+  const { user } = useAuth();
+  const chatDepartmentIds = user?.department_ids || [];
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSession, setActiveSession] = useState<number | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -69,7 +72,8 @@ export default function AssistantPage() {
         companyId || undefined,
         Array.from(enabledSources),
         aiInsights,
-        modelMode
+        modelMode,
+        chatDepartmentIds
       );
       if (!activeSession) {
         setActiveSession(res.session_id);
@@ -132,28 +136,6 @@ export default function AssistantPage() {
               <Bot size={48} className="mb-4 text-slate-300" />
               <p className="text-lg font-medium">How can I help you?</p>
               <p className="text-sm mt-1">Ask about your documents, data, or FAQ. Source Only is the default.</p>
-              <div className="mt-6 w-full max-w-xl">
-                <p className="text-xs font-medium text-slate-500 mb-2">Try asking:</p>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {[
-                    "Which lecturers have the highest evaluation percentage?",
-                    "Show me student comments for a course",
-                    "List staff by school or department",
-                    "What do students say about teaching quality?",
-                    "How many students were evaluated per course?",
-                    "What data or tables do we have?",
-                  ].map((q) => (
-                    <button
-                      key={q}
-                      type="button"
-                      onClick={() => setInput(q)}
-                      className="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs text-left transition-colors border border-slate-200"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
           {messages.map((msg) => (
@@ -264,11 +246,11 @@ export default function AssistantPage() {
           </div>
           {!aiInsights && (
             <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
-              Source Only is on: ANDAI will answer only from the selected database, PDFs/docs, or FAQ. If no evidence is found, it will refuse instead of using general knowledge.
+              Answer source: approved knowledge base. ANDAI will answer only from selected data, documents, or FAQ. If no evidence is found, it will refuse instead of using general knowledge.
             </div>
           )}
           <div className="mb-2 flex items-center gap-2 text-[11px] flex-wrap">
-            <span className="text-slate-400">Model mode:</span>
+            <span className="text-slate-400">Response mode:</span>
             <button
               type="button"
               onClick={() => setModelMode("auto")}
@@ -290,7 +272,7 @@ export default function AssistantPage() {
               }`}
             >
               <Zap size={10} />
-              Instant
+              Quick
             </button>
             <button
               type="button"
@@ -302,7 +284,7 @@ export default function AssistantPage() {
               }`}
             >
               <Brain size={10} />
-              Thinking
+              Deep
             </button>
           </div>
           <div className="flex gap-2">
@@ -322,6 +304,11 @@ export default function AssistantPage() {
               <Send size={18} />
             </button>
           </div>
+          {chatDepartmentIds.length === 0 && (
+            <p className="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+              No department access is assigned. You can still chat, but department knowledge sources may return no matches.
+            </p>
+          )}
         </div>
       </div>
     </div>

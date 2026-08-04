@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.company_ai_settings import CompanyAISettings
 
-DEFAULT_SOURCES = ["database", "documents", "faq"]
+DEFAULT_SOURCES = ["database", "documents", "faq", "apis"]
 
 
 async def get_or_create_company_ai_settings(db: AsyncSession, company_id: int) -> CompanyAISettings:

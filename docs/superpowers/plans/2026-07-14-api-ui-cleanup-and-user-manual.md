@@ -30,7 +30,7 @@ ok(!databaseSource.includes('label: "API Connectors"'), "database must not expos
 
 - [ ] **Step 2: Run the check and verify it fails**
 
-Run: `node frontend/scripts/check-assistant-chat-policy.ts`
+Run from `frontend/`: `node scripts/check-assistant-chat-policy.ts`
 
 Expected: assertion failure stating that the Assistant or Database still exposes an API surface.
 
@@ -59,7 +59,7 @@ Remove `api-connectors` from the `Tab` union, remove its tab entry, state, loade
 
 - [ ] **Step 3: Run the source-policy check**
 
-Run: `node frontend/scripts/check-assistant-chat-policy.ts`
+Run from `frontend/`: `node scripts/check-assistant-chat-policy.ts`
 
 Expected: `assistant_chat_policy_ok`.
 
@@ -167,7 +167,9 @@ Verify HTTP 200 for local frontend `/dashboard/assistant`, local backend `/healt
 Run:
 
 ```bash
-node frontend/scripts/check-assistant-chat-policy.ts
+cd frontend
+node scripts/check-assistant-chat-policy.ts
+cd ..
 pnpm --dir frontend build
 ```
 

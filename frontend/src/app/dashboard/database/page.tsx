@@ -12,6 +12,8 @@ export default function DatabasePage() {
   const companyId = useCompanyId();
   const [tab, setTab] = useState<Tab>("tables");
   const [datasets, setDatasets] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [datasetsLoading, setDatasetsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -62,13 +64,26 @@ export default function DatabasePage() {
     if (companyId) loadDatasets();
   }, [companyId, loadDatasets]);
 
+  useEffect(() => {
+    if (!companyId) return;
+    api.getDepartments(companyId).then((items) => {
+      setDepartments(items);
+      setDepartmentId((current) => current ?? items[0]?.id ?? null);
+    }).catch(() => {
+      setDepartments([]);
+      setDepartmentId(null);
+    });
+  }, [companyId]);
+
   const handleCreateTable = async () => {
-    if (!companyId || !tableName) return;
+    if (!companyId || !departmentId || !tableName) return;
     setLoading(true);
     try {
       await api.createManualTable(companyId, {
         display_name: tableName,
         description: tableDesc || undefined,
+        department_id: departmentId,
+        visibility: "department",
         columns: columns.filter((c) => c.name),
       });
       await loadDatasets();
@@ -83,12 +98,12 @@ export default function DatabasePage() {
   const isSQL = uploadFile?.name.toLowerCase().endsWith(".sql");
 
   const handleUploadTable = async () => {
-    if (!companyId || !uploadFile || !uploadName) return;
+    if (!companyId || !departmentId || !uploadFile || !uploadName) return;
     setLoading(true);
     setUploadResult(null);
     try {
       if (isSQL) {
-        const result = await api.uploadSQL(companyId, uploadFile, uploadName, uploadDesc);
+        const result = await api.uploadSQL(companyId, uploadFile, uploadName, uploadDesc, departmentId);
         if (result?.errors?.length) {
           setUploadResult(result);
         } else {
@@ -102,7 +117,7 @@ export default function DatabasePage() {
         }
         await loadDatasets();
       } else {
-        await api.uploadTableAndData(companyId, uploadFile, uploadName, uploadDesc);
+        await api.uploadTableAndData(companyId, uploadFile, uploadName, uploadDesc, departmentId);
         await loadDatasets();
         setTab("tables");
         setUploadFile(null);
@@ -252,7 +267,14 @@ export default function DatabasePage() {
   if (!companyId)
     return (
       <div className="text-slate-400 text-center py-12">
-        Select a company to manage databases
+        Select an organization to manage databases
+      </div>
+    );
+
+  if (departments.length === 0)
+    return (
+      <div className="text-slate-400 text-center py-12">
+        No department access assigned yet.
       </div>
     );
 
@@ -261,6 +283,19 @@ export default function DatabasePage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Database</h1>
         <p className="text-slate-500 mt-1">Manage tables and import data</p>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="text-sm font-medium text-slate-700">Department</label>
+        <select
+          value={departmentId ?? ""}
+          onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
+          className="px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white"
+        >
+          {departments.map((department) => (
+            <option key={department.id} value={department.id}>{department.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className="flex gap-1 bg-white rounded-lg border border-slate-200 p-1">
@@ -295,6 +330,7 @@ export default function DatabasePage() {
                     <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Columns</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Rows</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Source</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Department</th>
                     <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
                     <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
                   </tr>
@@ -312,6 +348,9 @@ export default function DatabasePage() {
                       <td className="px-6 py-4 text-sm text-slate-600">{ds.row_count?.toLocaleString() ?? "—"}</td>
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-600">{ds.source}</span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {departments.find((department) => department.id === ds.department_id)?.name || "—"}
                       </td>
                       <td className="px-6 py-4">
                         <span
@@ -354,6 +393,18 @@ export default function DatabasePage() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                 placeholder="e.g. Sales Data"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+              <select
+                value={departmentId ?? ""}
+                onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              >
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>{department.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
@@ -407,7 +458,7 @@ export default function DatabasePage() {
           </div>
           <button
             onClick={handleCreateTable}
-            disabled={loading || !tableName || columns.every((c) => !c.name)}
+            disabled={loading || !departmentId || !tableName || columns.every((c) => !c.name)}
             className="px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50"
           >
             {loading ? (
@@ -434,6 +485,18 @@ export default function DatabasePage() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
                 placeholder="e.g. Q1 Revenue"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+              <select
+                value={departmentId ?? ""}
+                onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+              >
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>{department.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
@@ -579,7 +642,7 @@ export default function DatabasePage() {
 
           <button
             onClick={handleUploadTable}
-            disabled={loading || !uploadFile || !uploadName}
+            disabled={loading || !departmentId || !uploadFile || !uploadName}
             className="px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium disabled:opacity-50"
           >
             {loading ? (

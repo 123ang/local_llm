@@ -1,3 +1,5 @@
+import type { AuditLog } from "./types";
+
 const API_BASE = "/api";
 
 class ApiError extends Error {
@@ -24,6 +26,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (res.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("askai_selected_company_id");
       window.location.href = "/login";
     }
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -60,6 +63,21 @@ export const api = {
   updateCompanyAISettings: (id: number, data: any) =>
     request<any>(`/companies/${id}/ai-settings`, { method: "PATCH", body: JSON.stringify(data) }),
 
+  // Departments
+  getDepartments: (companyId?: number) =>
+    request<any[]>(`/departments${companyId ? `?company_id=${companyId}` : ""}`),
+  createDepartment: (data: { company_id: number; name: string; description?: string }) =>
+    request<any>("/departments", { method: "POST", body: JSON.stringify(data) }),
+  updateDepartment: (id: number, data: any) =>
+    request<any>(`/departments/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  getUserDepartmentGrants: (userId: number) =>
+    request<any>(`/departments/users/${userId}/grants`),
+  updateUserDepartmentGrants: (userId: number, departmentIds: number[]) =>
+    request<any>(`/departments/users/${userId}/grants`, {
+      method: "PUT",
+      body: JSON.stringify({ department_ids: departmentIds }),
+    }),
+
   // Users
   getUsers: (companyId?: number) =>
     request<any[]>(`/users${companyId ? `?company_id=${companyId}` : ""}`),
@@ -70,9 +88,11 @@ export const api = {
 
   // Documents
   getDocuments: (companyId: number) => request<any[]>(`/documents/${companyId}`),
-  uploadDocument: (companyId: number, file: File) => {
+  uploadDocument: (companyId: number, file: File, departmentId: number, visibility = "department") => {
     const form = new FormData();
     form.append("file", file);
+    form.append("department_id", String(departmentId));
+    form.append("visibility", visibility);
     return request<any>(`/documents/${companyId}`, { method: "POST", body: form });
   },
   deleteDocument: (companyId: number, docId: number) =>
@@ -91,11 +111,13 @@ export const api = {
   getDatasets: (companyId: number) => request<any[]>(`/datasets/${companyId}`),
   createManualTable: (companyId: number, data: any) =>
     request<any>(`/datasets/${companyId}/manual`, { method: "POST", body: JSON.stringify(data) }),
-  uploadTableAndData: (companyId: number, file: File, displayName: string, description: string) => {
+  uploadTableAndData: (companyId: number, file: File, displayName: string, description: string, departmentId: number, visibility = "department") => {
     const form = new FormData();
     form.append("file", file);
     form.append("display_name", displayName);
     form.append("description", description);
+    form.append("department_id", String(departmentId));
+    form.append("visibility", visibility);
     return request<any>(`/datasets/${companyId}/upload-table`, { method: "POST", body: form });
   },
   uploadDataToTable: (companyId: number, datasetId: number, file: File, mode: string) => {
@@ -114,17 +136,30 @@ export const api = {
     form.append("file", file);
     return request<any>(`/datasets/${companyId}/preview-sql`, { method: "POST", body: form });
   },
-  uploadSQL: (companyId: number, file: File, displayName: string, description: string) => {
+  uploadSQL: (companyId: number, file: File, displayName: string, description: string, departmentId: number, visibility = "department") => {
     const form = new FormData();
     form.append("file", file);
     form.append("display_name", displayName);
     form.append("description", description);
+    form.append("department_id", String(departmentId));
+    form.append("visibility", visibility);
     return request<any>(`/datasets/${companyId}/upload-sql`, { method: "POST", body: form });
   },
   getDatasetRows: (companyId: number, datasetId: number, limit = 100, offset = 0) =>
     request<{ columns: string[]; rows: Record<string, unknown>[]; total: number }>(
       `/datasets/${companyId}/${datasetId}/rows?limit=${limit}&offset=${offset}`
     ),
+
+  // API connectors
+  getApiConnectors: (companyId: number) => request<any[]>(`/api-connectors/${companyId}`),
+  createApiConnector: (companyId: number, data: any) =>
+    request<any>(`/api-connectors/${companyId}`, { method: "POST", body: JSON.stringify(data) }),
+  updateApiConnector: (companyId: number, connectorId: number, data: any) =>
+    request<any>(`/api-connectors/${companyId}/${connectorId}`, { method: "PATCH", body: JSON.stringify(data) }),
+  syncApiConnector: (companyId: number, connectorId: number) =>
+    request<any>(`/api-connectors/${companyId}/${connectorId}/sync`, { method: "POST" }),
+  deleteApiConnector: (companyId: number, connectorId: number) =>
+    request<void>(`/api-connectors/${companyId}/${connectorId}`, { method: "DELETE" }),
 
   // Chat
   getChatSessions: (companyId?: number) => request<any[]>(companyId ? `/chat/sessions?company_id=${companyId}` : "/chat/sessions"),
@@ -135,7 +170,8 @@ export const api = {
     companyId?: number,
     sources?: string[],
     aiInsights?: boolean,
-    modelMode: "auto" | "instant" | "thinking" = "auto"
+    modelMode: "auto" | "instant" | "thinking" = "auto",
+    departmentIds?: number[]
   ) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
@@ -146,6 +182,7 @@ export const api = {
           message,
           session_id: sessionId,
           company_id: companyId,
+          department_ids: departmentIds,
           sources: sources ?? undefined,
           ai_insights: aiInsights,
           model_mode: modelMode,
@@ -161,7 +198,7 @@ export const api = {
 
   // Audit
   getAuditLogs: (companyId?: number, limit = 100, offset = 0) =>
-    request<any[]>(`/audit?${companyId ? `company_id=${companyId}&` : ""}limit=${limit}&offset=${offset}`),
+    request<AuditLog[]>(`/audit?${companyId ? `company_id=${companyId}&` : ""}limit=${limit}&offset=${offset}`),
 
   // Evaluations
   getEvaluationQuestions: (companyId: number) => request<any[]>(`/evaluations/${companyId}/questions`),

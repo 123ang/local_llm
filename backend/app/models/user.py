@@ -18,3 +18,9 @@ class User(Base):
 
     company = relationship("Company", back_populates="users")
     chat_sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
+    department_access = relationship(
+        "UserDepartmentAccess",
+        foreign_keys="UserDepartmentAccess.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )

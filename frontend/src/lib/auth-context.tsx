@@ -9,12 +9,14 @@ interface User {
   role: string;
   company_id: number | null;
   company_name: string | null;
+  department_ids: number[];
+  departments: { id: number; company_id: number; name: string; slug: string }[];
 }
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   logout: () => void;
   loading: boolean;
   isAdmin: boolean;
@@ -40,15 +42,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const data = await api.login(email, password);
+    localStorage.removeItem("askai_selected_company_id");
+    if (data.user.role !== "super_admin" && data.user.company_id != null) {
+      localStorage.setItem("askai_selected_company_id", String(data.user.company_id));
+    }
     localStorage.setItem("token", data.access_token);
     localStorage.setItem("user", JSON.stringify(data.user));
     setToken(data.access_token);
     setUser(data.user);
+    return data.user;
   };
 
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
+    localStorage.removeItem("askai_selected_company_id");
     setToken(null);
     setUser(null);
     window.location.href = "/login";

@@ -1,4 +1,4 @@
-import { BarChart3, BriefcaseBusiness, Copy, Database, Download, FileText, HelpCircle, Lightbulb, ShieldCheck } from "lucide-react";
+import { BarChart3, BriefcaseBusiness, Copy, Database, Download, FileText, HelpCircle, Lightbulb, Plug, ShieldCheck } from "lucide-react";
 
 export function MessageContent({ content }: { content: string }) {
   const lines = content.split("\n");
@@ -162,11 +162,13 @@ export function SourceBadges({ sources }: { sources: any }) {
   const docs = sources.documents || [];
   const groupedDocs = groupDocumentCitations(docs);
   const faq = sources.faq || [];
+  const apis = sources.apis || [];
   const db = sources.database;
   const hasFaq = faq.length > 0;
   const hasDocs = docs.length > 0;
+  const hasApis = apis.length > 0;
   const hasDb = !!db;
-  if (!hasFaq && !hasDocs && !hasDb) return null;
+  if (!hasFaq && !hasDocs && !hasDb && !hasApis) return null;
 
   return (
     <div className="mt-3 space-y-2">
@@ -178,7 +180,12 @@ export function SourceBadges({ sources }: { sources: any }) {
         )}
         {hasDocs && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
-            <FileText size={11} /> {docs.length} PDF passage{docs.length === 1 ? "" : "s"} on {groupedDocs.length} page{groupedDocs.length === 1 ? "" : "s"}
+            <FileText size={11} /> {docs.length} document passage{docs.length === 1 ? "" : "s"} on {groupedDocs.length} section{groupedDocs.length === 1 ? "" : "s"}
+          </span>
+        )}
+        {hasApis && (
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-cyan-50 text-cyan-700 text-xs font-medium border border-cyan-200">
+            <Plug size={11} /> {apis.length} API snapshot{apis.length === 1 ? "" : "s"}
           </span>
         )}
         {hasDb && (
@@ -238,6 +245,20 @@ export function SourceBadges({ sources }: { sources: any }) {
                   <div key={i} className="rounded-md bg-amber-50 border border-amber-100 p-2">
                     <div className="font-medium text-amber-700">{item.question}</div>
                     <div className="mt-1 text-slate-600 line-clamp-2">{item.answer}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {hasApis && (
+            <div>
+              <div className="font-semibold text-slate-700 mb-1">APIs</div>
+              <div className="space-y-2">
+                {apis.map((item: any, i: number) => (
+                  <div key={i} className="rounded-md bg-cyan-50 border border-cyan-100 p-2">
+                    <div className="font-medium text-cyan-700">{item.name}</div>
+                    <div className="text-cyan-600/70 mt-0.5">Status: {item.status_code ?? "—"}</div>
+                    <div className="mt-1 text-slate-600 line-clamp-3">{item.content}</div>
                   </div>
                 ))}
               </div>

@@ -10,10 +10,12 @@ from app.core.probe_detection import is_suspicious_probe_path
 
 from app.api.auth import router as auth_router
 from app.api.companies import router as companies_router
+from app.api.departments import router as departments_router
 from app.api.users import router as users_router
 from app.api.faq import router as faq_router
 from app.api.documents import router as documents_router
 from app.api.datasets import router as datasets_router
+from app.api.api_connectors import router as api_connectors_router
 from app.api.chat import router as chat_router
 from app.api.audit import router as audit_router
 from app.api.status import router as status_router
@@ -103,10 +105,12 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth_router, prefix=settings.API_PREFIX)
 app.include_router(companies_router, prefix=settings.API_PREFIX)
+app.include_router(departments_router, prefix=settings.API_PREFIX)
 app.include_router(users_router, prefix=settings.API_PREFIX)
 app.include_router(faq_router, prefix=settings.API_PREFIX)
 app.include_router(documents_router, prefix=settings.API_PREFIX)
 app.include_router(datasets_router, prefix=settings.API_PREFIX)
+app.include_router(api_connectors_router, prefix=settings.API_PREFIX)
 app.include_router(chat_router, prefix=settings.API_PREFIX)
 app.include_router(audit_router, prefix=settings.API_PREFIX)
 app.include_router(status_router, prefix=settings.API_PREFIX)

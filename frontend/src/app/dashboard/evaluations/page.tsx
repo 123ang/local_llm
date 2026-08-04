@@ -98,7 +98,7 @@ export default function EvaluationsPage() {
       question: question?.question ?? "",
       passed: run.passed,
       latency_ms: run.latency_ms ?? "",
-      model_tier: run.model_tier ?? "",
+      response_mode: run.model_tier ?? "",
       missing_keywords: run.missing_keywords || [],
       expected_keywords: question?.expected_keywords || [],
       expected_source: question?.expected_source ?? "",
@@ -109,7 +109,7 @@ export default function EvaluationsPage() {
   });
   const exportCsv = () => {
     const rows = exportRows();
-    const headers = ["run_id", "question_id", "question", "passed", "latency_ms", "model_tier", "missing_keywords", "expected_keywords", "expected_source", "answer", "sources_used", "created_at"];
+    const headers = ["run_id", "question_id", "question", "passed", "latency_ms", "response_mode", "missing_keywords", "expected_keywords", "expected_source", "answer", "sources_used", "created_at"];
     const csv = [headers.join(","), ...rows.map(row => headers.map(header => csvCell(row[header as keyof typeof row])).join(","))].join("\n");
     downloadTextFile("andai-evaluation-results.csv", "text/csv;charset=utf-8", csv);
   };
@@ -123,7 +123,7 @@ export default function EvaluationsPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Evaluation Tests</h1>
-            <p className="text-slate-500 mt-1">Save regression questions and verify answers, sources, latency, and model tier.</p>
+            <p className="text-slate-500 mt-1">Save regression questions and verify answers, sources, latency, and response mode.</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <button onClick={exportCsv} disabled={!runs.length} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50">

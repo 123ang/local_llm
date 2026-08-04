@@ -13,7 +13,7 @@ class CompanyAISettings(Base):
     # Default is strict/source-bound for enterprise trust.
     default_source_only = Column(Boolean, default=True, nullable=False)
     ai_insights_allowed = Column(Boolean, default=True, nullable=False)
-    allowed_sources = Column(JSON, default=lambda: ["database", "documents", "faq"], nullable=False)
+    allowed_sources = Column(JSON, default=lambda: ["database", "documents", "faq", "apis"], nullable=False)
     min_document_relevance = Column(Float, default=0.60, nullable=False)
     require_citations = Column(Boolean, default=True, nullable=False)
     sql_visible_to_admins_only = Column(Boolean, default=True, nullable=False)

@@ -46,5 +46,6 @@ export function useCompanyId(): number | null {
     }
   }, [user, companyId]);
 
-  return companyId ?? user?.company_id ?? null;
+  if (user?.role !== "super_admin") return user?.company_id ?? null;
+  return companyId;
 }

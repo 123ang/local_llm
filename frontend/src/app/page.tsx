@@ -42,7 +42,7 @@ const FEATURES = [
   {
     icon: Shield,
     title: "Runs Locally",
-    desc: "Powered by Ollama — your data never leaves your server. Full privacy with open-source LLMs like Llama, Qwen, and more.",
+    desc: "Powered by a private local AI engine — your data never leaves your server.",
     color: "from-slate-600 to-slate-800",
   },
 ];
@@ -221,7 +221,7 @@ export default function LandingPage() {
             {[
               { icon: Globe, label: "Frontend", tech: "Next.js 15 · TypeScript · Tailwind CSS 4", desc: "Modern React UI with App Router, real-time chat, and responsive dashboard." },
               { icon: Zap, label: "Backend", tech: "FastAPI · Python 3.12 · SQLAlchemy", desc: "Async REST API with JWT auth, role-based access, text-to-SQL, and unified query engine." },
-              { icon: Lock, label: "AI Engine", tech: "Ollama · Qwen / Llama · nomic-embed-text", desc: "Local LLM inference and embeddings. Your prompts and data never leave the server." },
+              { icon: Lock, label: "AI Engine", tech: "Private local AI runtime", desc: "Local inference and retrieval. Your prompts and data never leave the server." },
             ].map((item) => (
               <div key={item.label} className="rounded-2xl border border-white/10 bg-white/5 p-7">
                 <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/10 text-red-400 mb-5">

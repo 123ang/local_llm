@@ -7,6 +7,7 @@ import { useCompanyId } from "@/hooks/useCompanyId";
 export default function FAQPage() {
   const companyId = useCompanyId();
   const [items, setItems] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({
@@ -14,10 +15,19 @@ export default function FAQPage() {
     answer: "",
     category: "",
     is_published: true,
+    department_id: "",
   });
 
   useEffect(() => {
     if (companyId) loadFAQ();
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    api.getDepartments(companyId).then((items) => {
+      setDepartments(items);
+      setForm((current) => ({ ...current, department_id: current.department_id || String(items[0]?.id || "") }));
+    }).catch(() => setDepartments([]));
   }, [companyId]);
 
   const loadFAQ = async () => {
@@ -28,12 +38,13 @@ export default function FAQPage() {
   };
 
   const handleSave = async () => {
-    if (!companyId || !form.question || !form.answer) return;
+    if (!companyId || !form.question || !form.answer || !form.department_id) return;
+    const payload = { ...form, department_id: Number(form.department_id) };
     try {
       if (editing) {
-        await api.updateFAQ(companyId, editing.id, form);
+        await api.updateFAQ(companyId, editing.id, payload);
       } else {
-        await api.createFAQ(companyId, form);
+        await api.createFAQ(companyId, payload);
       }
       await loadFAQ();
       resetForm();
@@ -65,6 +76,7 @@ export default function FAQPage() {
       answer: item.answer,
       category: item.category || "",
       is_published: item.is_published,
+      department_id: String(item.department_id || departments[0]?.id || ""),
     });
     setShowForm(true);
   };
@@ -72,14 +84,19 @@ export default function FAQPage() {
   const resetForm = () => {
     setShowForm(false);
     setEditing(null);
-    setForm({ question: "", answer: "", category: "", is_published: true });
+    setForm({ question: "", answer: "", category: "", is_published: true, department_id: String(departments[0]?.id || "") });
   };
 
   if (!companyId)
     return (
       <div className="text-slate-400 text-center py-12">
-        Select a company to manage FAQ
+        Select an organization to manage FAQ
       </div>
+    );
+
+  if (departments.length === 0)
+    return (
+      <div className="text-slate-400 text-center py-12">No department access assigned yet.</div>
     );
 
   return (
@@ -140,6 +157,20 @@ export default function FAQPage() {
               />
             </div>
             <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Department
+                </label>
+                <select
+                  value={form.department_id}
+                  onChange={(e) => setForm({ ...form, department_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                >
+                  {departments.map((department) => (
+                    <option key={department.id} value={department.id}>{department.name}</option>
+                  ))}
+                </select>
+              </div>
               <div className="flex-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">
                   Category
@@ -206,6 +237,9 @@ export default function FAQPage() {
                       {item.category}
                     </span>
                   )}
+                  <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-700">
+                    {departments.find((department) => department.id === item.department_id)?.name || "Department"}
+                  </span>
                   {!item.is_published && (
                     <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700">
                       Draft

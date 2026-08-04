@@ -8,6 +8,7 @@ class UserCreate(BaseModel):
     password: str
     role: str = "user"
     company_id: int | None = None
+    department_ids: list[int] = []
 
 
 class UserUpdate(BaseModel):
@@ -15,6 +16,7 @@ class UserUpdate(BaseModel):
     role: str | None = None
     is_active: bool | None = None
     company_id: int | None = None
+    department_ids: list[int] | None = None
 
 
 class UserOut(BaseModel):
@@ -24,6 +26,8 @@ class UserOut(BaseModel):
     role: str
     company_id: int | None = None
     company_name: str | None = None
+    department_ids: list[int] = []
+    departments: list[dict] = []
     is_active: bool
     created_at: datetime
 

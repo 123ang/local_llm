@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import require_admin, ensure_company_admin_access
+from app.core.dependencies import require_admin, ensure_company_admin_access, resolve_department_scope
 from app.models.evaluation import EvaluationQuestion, EvaluationRun
 from app.models.user import User
 from app.schemas.evaluation import EvaluationQuestionCreate, EvaluationQuestionOut, EvaluationQuestionUpdate, EvaluationRunOut
@@ -92,12 +92,14 @@ async def run_question(company_id: int, question_id: int, current_user: User = D
 
     settings = await get_or_create_company_ai_settings(db, company_id)
     enabled_sources = normalize_allowed_sources(q.sources, settings.allowed_sources)
+    department_ids = await resolve_department_scope(db, current_user, company_id)
     start = time.time()
     output = await unified_query(
         question=q.question,
         company_id=company_id,
         db=db,
         enabled_sources=enabled_sources,
+        department_ids=department_ids,
         ai_insights=q.ai_insights and settings.ai_insights_allowed,
         model_mode="instant",
         document_min_relevance=settings.min_document_relevance,

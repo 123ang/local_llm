@@ -1,6 +1,6 @@
 """
-Full PDF processing pipeline:
-  1. Extract text per page (PyMuPDF)
+Full document processing pipeline:
+  1. Extract text per page/section (PDF via PyMuPDF, Word via OOXML)
   2. Split into overlapping chunks
   3. Generate embeddings for each chunk (Ollama nomic-embed-text)
   4. Save DocumentChunk rows with content + embedding
@@ -16,6 +16,7 @@ from app.core.database import async_session
 from app.core.logger import logger
 from app.models.document import Document, DocumentChunk
 from app.ingestion.pdf_parser import extract_text_from_pdf, chunk_text
+from app.ingestion.office_parser import extract_text_from_docx
 from app.llm.embeddings.embedding_client import get_embedding
 from app.llm.vector_store import update_document_chunk_vectors
 
@@ -43,11 +44,11 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
     await db.commit()
 
     try:
-        # 1. Extract text pages (run sync PDF parser in thread to avoid blocking the event loop)
-        pages = await asyncio.to_thread(extract_text_from_pdf, doc.file_path)
+        # 1. Extract text pages/sections in a thread to avoid blocking the event loop.
+        pages = await asyncio.to_thread(_extract_document_pages, doc)
         if not pages:
             doc.status = "error"
-            doc.error_message = "No text could be extracted from this PDF."
+            doc.error_message = "No text could be extracted from this document."
             await db.commit()
             return
 
@@ -94,6 +95,8 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
             chunk_obj = DocumentChunk(
                 document_id=document_id,
                 company_id=doc.company_id,
+                department_id=doc.department_id,
+                visibility=doc.visibility,
                 chunk_index=idx,
                 content=chunk_data["content"],
                 page_number=chunk_data["page"],
@@ -141,3 +144,10 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
         doc.status = "error"
         doc.error_message = f"Document processing failed. Reference: {correlation_id}"
         await db.commit()
+
+
+def _extract_document_pages(doc: Document) -> list[dict]:
+    suffix = (doc.original_name or doc.filename or "").lower()
+    if doc.mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" or suffix.endswith(".docx"):
+        return extract_text_from_docx(doc.file_path)
+    return extract_text_from_pdf(doc.file_path)

@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: int | None = None
     company_id: int | None = None
+    department_ids: list[int] | None = None
     sources: list[str] | None = None  # subset of ["database", "documents", "faq"]; None = all
     ai_insights: bool | None = None  # None = company default; False = strict source-only mode
     model_mode: Literal["auto", "instant", "thinking"] = "auto"
@@ -25,6 +26,7 @@ class ChatResponse(BaseModel):
 class ChatSessionOut(BaseModel):
     id: int
     title: str | None = None
+    department_ids: list[int] = []
     created_at: datetime
     message_count: int = 0
 

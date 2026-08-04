@@ -8,6 +8,8 @@ class Dataset(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+    visibility = Column(String(50), default="department", nullable=False)
     table_name = Column(String(255), nullable=False)
     display_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -30,6 +32,7 @@ class DatasetImport(Base):
     id = Column(Integer, primary_key=True, index=True)
     dataset_id = Column(Integer, ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
     filename = Column(String(500), nullable=False)
     file_path = Column(String(1000), nullable=False)
     row_count = Column(Integer, default=0)

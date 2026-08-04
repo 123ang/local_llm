@@ -40,6 +40,7 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ):
     from app.models.user import User
+    from app.models.department import UserDepartmentAccess
 
     payload = decode_token(token)
     user_id = payload.get("sub")
@@ -48,7 +49,12 @@ async def get_current_user(
 
     from sqlalchemy.orm import selectinload
     result = await db.execute(
-        select(User).options(selectinload(User.company)).where(User.id == int(user_id))
+        select(User)
+        .options(
+            selectinload(User.company),
+            selectinload(User.department_access).selectinload(UserDepartmentAccess.department),
+        )
+        .where(User.id == int(user_id))
     )
     user = result.scalar_one_or_none()
     if not user or not user.is_active:

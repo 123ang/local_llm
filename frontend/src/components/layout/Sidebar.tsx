@@ -7,32 +7,29 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/BrandLogo";
+import { getSidebarSections, SidebarItemKey } from "@/lib/navigation-policy";
 
-const mainNav = [
-  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Assistant", href: "/dashboard/assistant", icon: MessageSquare },
-];
-
-const adminNav = [
-  { name: "Documents", href: "/dashboard/documents", icon: FileText },
-  { name: "FAQ", href: "/dashboard/faq", icon: HelpCircle },
-  { name: "Database", href: "/dashboard/database", icon: Database },
-  { name: "Evaluations", href: "/dashboard/evaluations", icon: ClipboardCheck },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-];
-
-const platformNav = [
-  { name: "Companies", href: "/dashboard/companies", icon: Building2 },
-  { name: "Users", href: "/dashboard/users", icon: Users },
-  { name: "Audit Logs", href: "/dashboard/audit", icon: ScrollText },
-];
+const icons: Record<SidebarItemKey, typeof LayoutDashboard> = {
+  overview: LayoutDashboard,
+  assistant: MessageSquare,
+  documents: FileText,
+  faq: HelpCircle,
+  database: Database,
+  evaluations: ClipboardCheck,
+  analytics: BarChart3,
+  organizations: Building2,
+  users: Users,
+  audit: ScrollText,
+};
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, logout, isAdmin, isSuperAdmin } = useAuth();
+  const { user, logout } = useAuth();
+  const sections = getSidebarSections(user?.role);
 
-  const NavItem = ({ item }: { item: (typeof mainNav)[0] }) => {
+  const NavItem = ({ item }: { item: { key: SidebarItemKey; name: string; href: string } }) => {
     const active = pathname === item.href;
+    const Icon = icons[item.key];
     return (
       <Link
         href={item.href}
@@ -42,7 +39,7 @@ export default function Sidebar() {
             : "text-slate-300 hover:bg-white/10 hover:text-white"
         }`}
       >
-        <item.icon size={18} />
+        <Icon size={18} />
         {item.name}
       </Link>
     );
@@ -55,30 +52,14 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
-        <div>
-          <p className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Main</p>
-          <div className="space-y-1">
-            {mainNav.map((item) => <NavItem key={item.href} item={item} />)}
-          </div>
-        </div>
-
-        {isAdmin && (
-          <div>
-            <p className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Administration</p>
+        {sections.map((section) => (
+          <div key={section.label}>
+            <p className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">{section.label}</p>
             <div className="space-y-1">
-              {adminNav.map((item) => <NavItem key={item.href} item={item} />)}
+              {section.items.map((item) => <NavItem key={item.href} item={item} />)}
             </div>
           </div>
-        )}
-
-        {isSuperAdmin && (
-          <div>
-            <p className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Platform</p>
-            <div className="space-y-1">
-              {platformNav.map((item) => <NavItem key={item.href} item={item} />)}
-            </div>
-          </div>
-        )}
+        ))}
       </nav>
 
       <div className="p-3 border-t border-white/10">

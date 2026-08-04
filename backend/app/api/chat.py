@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.core.errors import correlation_id_from_request, public_error_detail
 from app.core.logger import logger
 from app.core.security import get_current_user
-from app.core.dependencies import ensure_company_access
+from app.core.dependencies import ensure_company_access, resolve_department_scope
 from app.schemas.chat import ChatRequest, ChatResponse, ChatSessionOut, ChatMessageOut
 from app.models.chat import ChatSession, ChatMessage
 from app.models.user import User
@@ -56,6 +56,7 @@ def _has_attached_evidence(sources: dict | None) -> bool:
     return bool(
         sources.get("documents")
         or sources.get("faq")
+        or sources.get("apis")
         or (isinstance(db_source, dict) and db_source.get("row_count", 0) > 0)
     )
 
@@ -74,6 +75,17 @@ def _add_ai_insight_metadata(sources: dict | None, ai_insights: bool, answer: st
         "ai_insight_contributed": bool(ai_insights and (insight_marker or not has_evidence)),
     }
     return enriched
+
+
+def _resolve_ai_insights(
+    requested_ai_insights: bool | None,
+    default_source_only: bool,
+    ai_insights_allowed: bool,
+) -> bool:
+    ai_insights = requested_ai_insights
+    if ai_insights is None:
+        ai_insights = not default_source_only
+    return bool(ai_insights and ai_insights_allowed)
 
 
 async def _build_contextual_question(db: AsyncSession, session_id: int, current_message: str) -> str:
@@ -128,7 +140,7 @@ async def list_sessions(company_id: int | None = None, current_user: User = Depe
     )
     counts = {row.session_id: row.cnt for row in counts_result.all()}
     return [
-        ChatSessionOut(id=s.id, title=s.title, created_at=s.created_at, message_count=counts.get(s.id, 0))
+        ChatSessionOut(id=s.id, title=s.title, department_ids=s.department_ids or [], created_at=s.created_at, message_count=counts.get(s.id, 0))
         for s in sessions
     ]
 
@@ -152,6 +164,12 @@ async def ask_question(
     
     requested_company_id = data.company_id or current_user.company_id
     ensure_company_access(current_user, requested_company_id)
+    requested_department_ids = await resolve_department_scope(
+        db,
+        current_user,
+        requested_company_id,
+        data.department_ids,
+    )
     
     # Get or create session
     if data.session_id:
@@ -163,9 +181,12 @@ async def ask_question(
         if data.company_id is not None and data.company_id != session.company_id:
             raise HTTPException(status_code=403, detail="Session belongs to a different company")
         requested_company_id = session.company_id
+        if data.department_ids is not None and sorted(data.department_ids) != sorted(session.department_ids or []):
+            raise HTTPException(status_code=403, detail="Session belongs to a different department scope")
+        requested_department_ids = session.department_ids or requested_department_ids
     else:
         company_id = requested_company_id or 0
-        session = ChatSession(company_id=company_id, user_id=current_user.id, title=data.message[:100])
+        session = ChatSession(company_id=company_id, user_id=current_user.id, department_ids=requested_department_ids, title=data.message[:100])
         db.add(session)
         await db.commit()
         await db.refresh(session)
@@ -181,17 +202,18 @@ async def ask_question(
         query_company_id = requested_company_id
         ai_settings = await get_or_create_company_ai_settings(db, query_company_id)
         enabled_sources = normalize_allowed_sources(data.sources, ai_settings.allowed_sources)
-        ai_insights = data.ai_insights
-        if ai_insights is None:
-            ai_insights = not ai_settings.default_source_only
-        if ai_insights and not ai_settings.ai_insights_allowed:
-            ai_insights = False
+        ai_insights = _resolve_ai_insights(
+            data.ai_insights,
+            ai_settings.default_source_only,
+            ai_settings.ai_insights_allowed,
+        )
         contextual_question = await _build_contextual_question(db, session.id, data.message)
         result = await unified_query(
             question=contextual_question,
             company_id=query_company_id,
             db=db,
             enabled_sources=enabled_sources,
+            department_ids=requested_department_ids,
             ai_insights=ai_insights,
             model_mode=data.model_mode,
             document_min_relevance=ai_settings.min_document_relevance,

@@ -19,5 +19,7 @@ class UserBrief(BaseModel):
     role: str
     company_id: int | None = None
     company_name: str | None = None
+    department_ids: list[int] = []
+    departments: list[dict] = []
 
     model_config = {"from_attributes": True}

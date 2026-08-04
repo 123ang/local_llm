@@ -13,11 +13,15 @@ class DatasetCreateManual(BaseModel):
     display_name: str
     description: str | None = None
     columns: list[ColumnDef]
+    department_id: int | None = None
+    visibility: str = "department"
 
 
 class DatasetOut(BaseModel):
     id: int
     company_id: int
+    department_id: int | None = None
+    visibility: str
     table_name: str
     display_name: str
     description: str | None = None

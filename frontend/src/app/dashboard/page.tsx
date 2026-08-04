@@ -4,16 +4,19 @@ import { FileText, MessageSquare, Database, HelpCircle, TrendingUp, RefreshCw } 
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
+import { canAccessDashboardPath } from "@/lib/navigation-policy";
 import Link from "next/link";
 
 interface SystemStatus {
-  ollama: { connected: boolean; models: string[]; url: string };
+  ollama: { connected: boolean };
+  gpu: { available: boolean; provider: string; memory_used_mb: number | null; memory_total_mb: number | null };
+  rag: { connected: boolean };
   database: { connected: boolean; version: string };
   redis: { connected: boolean };
 }
 
 export default function OverviewPage() {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const companyId = useCompanyId();
 
   const [status, setStatus] = useState<SystemStatus | null>(null);
@@ -78,50 +81,89 @@ export default function OverviewPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <Link key={stat.label} href={stat.href}
-            className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow block">
-            <div className="flex items-center justify-between mb-3">
-              <div className={`p-2.5 rounded-lg ${stat.bg}`}>
-                <stat.icon size={20} className={stat.color} />
+        {stats.map((stat) => {
+          const card = (
+            <>
+              <div className="flex items-center justify-between mb-3">
+                <div className={`p-2.5 rounded-lg ${stat.bg}`}>
+                  <stat.icon size={20} className={stat.color} />
+                </div>
+                <TrendingUp size={16} className="text-emerald-500" />
               </div>
-              <TrendingUp size={16} className="text-emerald-500" />
+              <p className="text-2xl font-bold text-slate-900">{companyId ? stat.value : "—"}</p>
+              <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
+            </>
+          );
+          if (canAccessDashboardPath(user?.role, stat.href)) {
+            return (
+              <Link key={stat.label} href={stat.href}
+                className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow block">
+                {card}
+              </Link>
+            );
+          }
+          return (
+            <div key={stat.label} className="bg-white rounded-xl border border-slate-200 p-5">
+              {card}
             </div>
-            <p className="text-2xl font-bold text-slate-900">{companyId ? stat.value : "—"}</p>
-            <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
-          </Link>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Quick Start */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Start</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">
+            {isSuperAdmin ? "Platform Management" : "Quick Start"}
+          </h2>
           <div className="space-y-3">
-            <Link href="/dashboard/assistant"
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
-              <div className="p-2 rounded-lg bg-red-50"><MessageSquare size={18} className="text-red-600" /></div>
-              <div>
-                <p className="text-sm font-medium text-slate-900">Ask a Question</p>
-                <p className="text-xs text-slate-500">Chat with your knowledge base</p>
-              </div>
-            </Link>
-            <Link href="/dashboard/documents"
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
-              <div className="p-2 rounded-lg bg-blue-50"><FileText size={18} className="text-blue-600" /></div>
-              <div>
-                <p className="text-sm font-medium text-slate-900">Upload Document</p>
-                <p className="text-xs text-slate-500">Add PDFs to your knowledge base</p>
-              </div>
-            </Link>
-            <Link href="/dashboard/database"
-              className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
-              <div className="p-2 rounded-lg bg-emerald-50"><Database size={18} className="text-emerald-600" /></div>
-              <div>
-                <p className="text-sm font-medium text-slate-900">Import Data</p>
-                <p className="text-xs text-slate-500">Upload CSV or create tables</p>
-              </div>
-            </Link>
+            {isSuperAdmin ? (
+              <>
+                <Link href="/dashboard/companies"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
+                  <div className="p-2 rounded-lg bg-red-50"><Database size={18} className="text-red-600" /></div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Manage Organizations</p>
+                    <p className="text-xs text-slate-500">Set up departments, tenants, and AI source rules</p>
+                  </div>
+                </Link>
+                <Link href="/dashboard/users"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
+                  <div className="p-2 rounded-lg bg-blue-50"><MessageSquare size={18} className="text-blue-600" /></div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Assign Users</p>
+                    <p className="text-xs text-slate-500">Place users into the correct organization</p>
+                  </div>
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/dashboard/assistant"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
+                  <div className="p-2 rounded-lg bg-red-50"><MessageSquare size={18} className="text-red-600" /></div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Ask a Question</p>
+                    <p className="text-xs text-slate-500">Chat with your knowledge base</p>
+                  </div>
+                </Link>
+                <Link href="/dashboard/documents"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
+                  <div className="p-2 rounded-lg bg-blue-50"><FileText size={18} className="text-blue-600" /></div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Upload Document</p>
+                    <p className="text-xs text-slate-500">Add PDFs to your knowledge base</p>
+                  </div>
+                </Link>
+                <Link href="/dashboard/database"
+                  className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
+                  <div className="p-2 rounded-lg bg-emerald-50"><Database size={18} className="text-emerald-600" /></div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">Import Data</p>
+                    <p className="text-xs text-slate-500">Upload CSV or create tables</p>
+                  </div>
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
@@ -143,9 +185,9 @@ export default function OverviewPage() {
               </span>
             </div>
 
-            {/* Ollama */}
+            {/* AI engine */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Ollama LLM</span>
+              <span className="text-sm text-slate-600">AI Engine</span>
               {statusLoading ? (
                 <span className="flex items-center gap-1.5 text-sm text-slate-400">
                   <StatusDot ok={false} loading /> Checking…
@@ -155,19 +197,58 @@ export default function OverviewPage() {
                   <span className="flex items-center gap-1.5 text-sm text-emerald-600">
                     <StatusDot ok={true} /> Connected
                   </span>
-                  {status.ollama.models.length > 0 && (
-                    <span className="text-xs text-slate-400">
-                      {status.ollama.models.join(", ")}
-                    </span>
-                  )}
+                  <span className="text-xs text-slate-400">LLM ready</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-end gap-0.5">
                   <span className="flex items-center gap-1.5 text-sm text-red-500">
                     <StatusDot ok={false} /> Not connected
                   </span>
-                  <span className="text-xs text-slate-400">Run: ollama serve</span>
+                  <span className="text-xs text-slate-400">Service unavailable</span>
                 </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-600">Embedding Service</span>
+              {statusLoading ? (
+                <span className="flex items-center gap-1.5 text-sm text-slate-400">
+                  <StatusDot ok={false} loading /> Checking…
+                </span>
+              ) : (
+                <span className={`flex items-center gap-1.5 text-sm ${status?.ollama.connected ? "text-emerald-600" : "text-red-500"}`}>
+                  <StatusDot ok={status?.ollama.connected ?? false} />
+                  {status?.ollama.connected ? "Connected" : "Not connected"}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-600">RAG Service</span>
+              {statusLoading ? (
+                <span className="flex items-center gap-1.5 text-sm text-slate-400">
+                  <StatusDot ok={false} loading /> Checking…
+                </span>
+              ) : (
+                <span className={`flex items-center gap-1.5 text-sm ${status?.rag.connected ? "text-emerald-600" : "text-red-500"}`}>
+                  <StatusDot ok={status?.rag.connected ?? false} />
+                  {status?.rag.connected ? "Running" : "Not connected"}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-600">GPU RAM</span>
+              {statusLoading ? (
+                <span className="flex items-center gap-1.5 text-sm text-slate-400">
+                  <StatusDot ok={false} loading /> Checking…
+                </span>
+              ) : status?.gpu.available ? (
+                <span className="text-sm text-emerald-600">
+                  {status.gpu.memory_used_mb} / {status.gpu.memory_total_mb} MB
+                </span>
+              ) : (
+                <span className="text-sm text-slate-400">Unavailable</span>
               )}
             </div>
 

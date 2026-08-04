@@ -7,6 +7,8 @@ class FAQCreate(BaseModel):
     answer: str
     category: str | None = None
     is_published: bool = True
+    department_id: int | None = None
+    visibility: str = "department"
 
 
 class FAQUpdate(BaseModel):
@@ -15,11 +17,15 @@ class FAQUpdate(BaseModel):
     category: str | None = None
     is_published: bool | None = None
     sort_order: int | None = None
+    department_id: int | None = None
+    visibility: str | None = None
 
 
 class FAQOut(BaseModel):
     id: int
     company_id: int
+    department_id: int | None = None
+    visibility: str
     question: str
     answer: str
     category: str | None = None

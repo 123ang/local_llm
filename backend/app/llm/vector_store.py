@@ -67,12 +67,16 @@ async def query_document_chunks(
     db: AsyncSession,
     *,
     company_id: int,
+    department_ids: list[int],
     query_embedding: list[float],
     limit: int = 5,
     min_score: float = 0.5,
 ) -> list[dict[str, Any]]:
     """Search document chunks with pgvector cosine similarity."""
     if not query_embedding:
+        return []
+    department_ids = [int(i) for i in department_ids]
+    if not department_ids:
         return []
 
     try:
@@ -83,6 +87,7 @@ async def query_document_chunks(
                 "FROM document_chunks dc "
                 "JOIN documents d ON d.id = dc.document_id "
                 "WHERE dc.company_id = :company_id "
+                "AND dc.department_id = ANY(:department_ids) "
                 "AND d.status = 'ready' "
                 "AND dc.embedding_vector IS NOT NULL "
                 "ORDER BY dc.embedding_vector <=> CAST(:embedding AS vector) "
@@ -91,6 +96,7 @@ async def query_document_chunks(
             {
                 "embedding": _vector_literal(query_embedding),
                 "company_id": int(company_id),
+                "department_ids": department_ids,
                 "limit": int(limit),
             },
         )

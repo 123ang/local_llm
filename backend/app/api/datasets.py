@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.core.database import get_db, engine
 from app.core.database_roles import dataset_write_transaction, grant_text_to_sql_select
-from app.core.dependencies import require_admin, ensure_company_access, ensure_company_admin_access
+from app.core.dependencies import (
+    require_knowledge_admin,
+    ensure_company_access,
+    ensure_department_access,
+    resolve_department_scope,
+)
 from app.core.errors import correlation_id_from_request, public_error_detail
 from app.core.logger import logger
 from app.core.security import get_current_user
@@ -82,12 +87,22 @@ def _dedupe_identifiers(names: list[str]) -> list[str]:
 @router.get("/{company_id}", response_model=list[DatasetOut])
 async def list_datasets(company_id: int, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     ensure_company_access(current_user, company_id)
-    result = await db.execute(select(Dataset).where(Dataset.company_id == company_id).order_by(Dataset.created_at.desc()))
+    department_ids = await resolve_department_scope(db, current_user, company_id)
+    if not department_ids:
+        return []
+    result = await db.execute(
+        select(Dataset)
+        .where(Dataset.company_id == company_id, Dataset.department_id.in_(department_ids))
+        .order_by(Dataset.created_at.desc())
+    )
     return list(result.scalars().all())
 
 @router.post("/{company_id}/manual", response_model=DatasetOut, status_code=201)
-async def create_manual_table(company_id: int, data: DatasetCreateManual, current_user: User = Depends(require_admin), db: AsyncSession = Depends(get_db)):
-    ensure_company_admin_access(current_user, company_id)
+async def create_manual_table(company_id: int, data: DatasetCreateManual, current_user: User = Depends(require_knowledge_admin), db: AsyncSession = Depends(get_db)):
+    ensure_company_access(current_user, company_id)
+    if data.department_id is None:
+        raise HTTPException(status_code=400, detail="Department is required")
+    await ensure_department_access(db, current_user, company_id, data.department_id)
     if not data.columns:
         raise HTTPException(status_code=400, detail="At least one column is required")
     table_name = _safe_table_name(company_id, data.display_name)
@@ -108,7 +123,8 @@ async def create_manual_table(company_id: int, data: DatasetCreateManual, curren
         await grant_text_to_sql_select(conn, table_name)
     
     dataset = Dataset(
-        company_id=company_id, table_name=table_name, display_name=data.display_name,
+        company_id=company_id, department_id=data.department_id, visibility=data.visibility,
+        table_name=table_name, display_name=data.display_name,
         description=data.description, columns_schema=schema_list, source="manual",
         created_by=current_user.id,
     )
@@ -124,11 +140,14 @@ async def upload_table_and_data(
     file: UploadFile = File(...),
     display_name: str = Form(...),
     description: str = Form(""),
-    current_user: User = Depends(require_admin),
+    department_id: int = Form(...),
+    visibility: str = Form("department"),
+    current_user: User = Depends(require_knowledge_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload CSV → auto-create table from columns → insert data."""
-    ensure_company_admin_access(current_user, company_id)
+    ensure_company_access(current_user, company_id)
+    await ensure_department_access(db, current_user, company_id, department_id)
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
     
@@ -191,14 +210,15 @@ async def upload_table_and_data(
         await grant_text_to_sql_select(conn, table_name)
     
     dataset = Dataset(
-        company_id=company_id, table_name=table_name, display_name=display_name,
+        company_id=company_id, department_id=department_id, visibility=visibility,
+        table_name=table_name, display_name=display_name,
         description=description, columns_schema=schema_list, row_count=row_count,
         source="csv_upload", created_by=current_user.id,
     )
     db.add(dataset)
     
     imp = DatasetImport(
-        dataset_id=0, company_id=company_id, filename=file.filename,
+        dataset_id=0, company_id=company_id, department_id=department_id, filename=file.filename,
         file_path=str(file_path), row_count=row_count, mode="replace",
         status="completed",  imported_by=current_user.id,
     )
@@ -217,11 +237,11 @@ async def upload_data_to_existing(
     company_id: int, dataset_id: int,
     file: UploadFile = File(...),
     mode: str = Form("append"),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_knowledge_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload CSV data into an existing table."""
-    ensure_company_admin_access(current_user, company_id)
+    ensure_company_access(current_user, company_id)
     if mode not in ("append", "replace"):
         raise HTTPException(status_code=400, detail="mode must be append or replace")
     if not file.filename or not file.filename.lower().endswith(".csv"):
@@ -230,6 +250,7 @@ async def upload_data_to_existing(
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
+    await ensure_department_access(db, current_user, company_id, dataset.department_id)
     
     company_dir = Path(settings.UPLOAD_DIR) / "companies" / str(company_id) / "csv"
     company_dir.mkdir(parents=True, exist_ok=True)
@@ -268,7 +289,7 @@ async def upload_data_to_existing(
         dataset.row_count = count_result.scalar() or 0
     
     imp = DatasetImport(
-        dataset_id=dataset.id, company_id=company_id, filename=file.filename,
+        dataset_id=dataset.id, company_id=company_id, department_id=dataset.department_id, filename=file.filename,
         file_path=str(file_path), row_count=len(records), mode=mode,
         status="completed", imported_by=current_user.id,
     )
@@ -283,11 +304,11 @@ async def get_dataset_rows(
     dataset_id: int,
     limit: int = 100,
     offset: int = 0,
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_knowledge_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Fetch rows from a dataset table for viewing."""
-    ensure_company_admin_access(current_user, company_id)
+    ensure_company_access(current_user, company_id)
     limit = max(1, min(limit, 500))
     offset = max(0, offset)
     result = await db.execute(
@@ -296,6 +317,7 @@ async def get_dataset_rows(
     dataset = result.scalar_one_or_none()
     if not dataset:
         raise HTTPException(status_code=404, detail="Dataset not found")
+    await ensure_department_access(db, current_user, company_id, dataset.department_id)
 
     schema = dataset.columns_schema or []
     col_names = [s["name"] for s in schema]
@@ -319,9 +341,9 @@ async def get_dataset_rows(
 
 
 @router.post("/{company_id}/preview-csv", response_model=CSVPreviewOut)
-async def preview_csv(company_id: int, file: UploadFile = File(...), current_user: User = Depends(require_admin)):
+async def preview_csv(company_id: int, file: UploadFile = File(...), current_user: User = Depends(require_knowledge_admin)):
     """Preview a CSV file before importing."""
-    ensure_company_admin_access(current_user, company_id)
+    ensure_company_access(current_user, company_id)
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
     df = pd.read_csv(file.file, nrows=100)
@@ -348,11 +370,11 @@ async def preview_sql(
     company_id: int,
     request: Request,
     file: UploadFile = File(...),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_knowledge_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Parse a SQL dump and return a preview of tables + data it contains."""
-    ensure_company_admin_access(current_user, company_id)
+    ensure_company_access(current_user, company_id)
     if not file.filename or not file.filename.lower().endswith(".sql"):
         raise HTTPException(status_code=400, detail="Only .sql files are allowed")
 
@@ -416,11 +438,14 @@ async def upload_sql(
     file: UploadFile = File(...),
     display_name: str = Form(...),
     description: str = Form(""),
-    current_user: User = Depends(require_admin),
+    department_id: int = Form(...),
+    visibility: str = Form("department"),
+    current_user: User = Depends(require_knowledge_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Import a SQL dump: create tables and insert data, returns list of created datasets."""
-    ensure_company_admin_access(current_user, company_id)
+    ensure_company_access(current_user, company_id)
+    await ensure_department_access(db, current_user, company_id, department_id)
     if not file.filename or not file.filename.lower().endswith(".sql"):
         raise HTTPException(status_code=400, detail="Only .sql files are allowed")
 
@@ -500,6 +525,8 @@ async def upload_sql(
 
         dataset = Dataset(
             company_id=company_id,
+            department_id=department_id,
+            visibility=visibility,
             table_name=pg_name,
             display_name=table_display,
             description=description,
@@ -515,6 +542,7 @@ async def upload_sql(
         imp = DatasetImport(
             dataset_id=dataset.id,
             company_id=company_id,
+            department_id=department_id,
             filename=file.filename,
             file_path=str(file_path),
             row_count=row_count,

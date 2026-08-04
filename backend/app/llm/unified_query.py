@@ -10,6 +10,7 @@ from app.core.logger import logger
 from app.models.faq import FAQItem
 from app.models.document import Document, DocumentChunk
 from app.models.dataset import Dataset
+from app.models.api_connector import APIConnector
 
 SQL_DANGEROUS_FUNCTIONS = {
     "current_setting",
@@ -71,6 +72,7 @@ async def unified_query(
     company_id: int | None,
     db: AsyncSession,
     enabled_sources: list[str] | None = None,
+    department_ids: list[int] | None = None,
     ai_insights: bool = True,
     model_mode: str = "auto",
     document_min_relevance: float = 0.60,
@@ -85,32 +87,34 @@ async def unified_query(
     When ``ai_insights`` is False, strict evidence mode is used: answer only
     from selected sources, and refuse if no matching source evidence is found.
     """
-    all_sources = {"faq", "documents", "database"}
+    all_sources = {"faq", "documents", "database", "apis"}
     active = set(enabled_sources) & all_sources if enabled_sources is not None else all_sources
+    department_ids = sorted({int(i) for i in (department_ids or [])})
 
-    sources = {"faq": [], "documents": [], "database": None}
+    sources = {"faq": [], "documents": [], "database": None, "apis": []}
 
     faq_evidence = []
     doc_evidence = []
     db_evidence = []
+    api_evidence = []
 
     # 1. FAQ search
-    if company_id and "faq" in active:
-        faq_results = await _search_faq(db, company_id, question)
+    if company_id and department_ids and "faq" in active:
+        faq_results = await _search_faq(db, company_id, department_ids, question)
         for faq in faq_results:
             faq_evidence.append(f"[FAQ] Q: {faq['question']}\nA: {faq['answer']}")
             sources["faq"].append(faq)
 
     # 2. Document semantic search
-    if company_id and "documents" in active:
-        doc_results = await _search_documents_semantic(db, company_id, question)
+    if company_id and department_ids and "documents" in active:
+        doc_results = await _search_documents_semantic(db, company_id, department_ids, question)
         for chunk in doc_results:
             doc_evidence.append(f"[Document: {chunk['source']}, page {chunk['page']}]\n{chunk['content']}")
             sources["documents"].append(chunk)
 
     # 3. Structured data (Text-to-SQL)
-    if company_id and "database" in active:
-        sql_result = await _query_structured_data(db, company_id, question)
+    if company_id and department_ids and "database" in active:
+        sql_result = await _query_structured_data(db, company_id, department_ids, question)
         if sql_result:
             sources["database"] = sql_result
         if sql_result and (sql_result.get("blocked") or sql_result.get("error")):
@@ -121,6 +125,13 @@ async def unified_query(
                 db_evidence.append(f"[Database query result — {sql_result['row_count']} rows returned]\n{rows_text}")
             elif isinstance(sql_result["result"], str) and "error" not in sql_result["result"].lower():
                 db_evidence.append(f"[Database] {sql_result['result']}")
+
+    # 4. API connector snapshots
+    if company_id and department_ids and "apis" in active:
+        api_results = await _search_api_connectors(db, company_id, department_ids, question)
+        for item in api_results:
+            api_evidence.append(f"[API: {item['name']}]\n{item['content']}")
+            sources["apis"].append(item)
 
     # Deterministic formatting for key Kedah Investment demo questions.
     # Avoids bullet-list answers when the user specifically needs a table.
@@ -161,13 +172,18 @@ async def unified_query(
         evidence.extend(high_quality_docs)
     else:
         evidence.extend(doc_evidence)
+    evidence.extend(api_evidence)
 
     # Build a short schema summary so the LLM always knows what data exists,
     # even when no rows matched the specific question.
     schema_summary = ""
-    if company_id:
+    if company_id and department_ids:
         ds_result = await db.execute(
-            select(Dataset).where(Dataset.company_id == company_id, Dataset.is_queryable == True)
+            select(Dataset).where(
+                Dataset.company_id == company_id,
+                Dataset.department_id.in_(department_ids),
+                Dataset.is_queryable == True,
+            )
         )
         all_datasets = ds_result.scalars().all()
         if all_datasets:
@@ -177,9 +193,9 @@ async def unified_query(
                 parts.append(f'- {ds.display_name} ({ds.row_count} rows): columns {", ".join(col_names[:12])}')
             schema_summary = "Available database tables:\n" + "\n".join(parts)
 
-    # 4. Strict evidence mode: do not answer outside selected sources.
+    # 5. Strict evidence mode: do not answer outside selected sources.
     if not ai_insights:
-        strict_evidence = _build_strict_evidence(faq_evidence, db_evidence, doc_evidence, sources, document_min_relevance)
+        strict_evidence = _build_strict_evidence(faq_evidence, db_evidence, doc_evidence, api_evidence, sources, document_min_relevance)
         if not strict_evidence:
             return {
                 "answer": _source_only_refusal(active),
@@ -207,7 +223,7 @@ Answer using only the source evidence above. If the evidence does not contain th
             logger.error(f"Source-only generation error: {llm_err}")
             return {"answer": "The AI service encountered an error. Displaying source evidence directly:\n\n" + "\n\n".join(strict_evidence), "sources": sources, "model_tier": "instant"}
 
-    # 5. Generate answer using LLM — AI Insights may use general knowledge only when no sources match.
+    # 6. Generate answer using LLM — AI Insights may use general knowledge only when no sources match.
     has_evidence = bool(evidence)
     if model_mode == "instant":
         use_fast = True
@@ -301,6 +317,7 @@ def _build_strict_evidence(
     faq_evidence: list[str],
     db_evidence: list[str],
     doc_evidence: list[str],
+    api_evidence: list[str],
     sources: dict,
     document_min_relevance: float = 0.60,
 ) -> list[str]:
@@ -308,6 +325,7 @@ def _build_strict_evidence(
     evidence: list[str] = []
     evidence.extend(faq_evidence)
     evidence.extend(db_evidence)
+    evidence.extend(api_evidence)
 
     for i, chunk in enumerate(sources.get("documents") or []):
         score = chunk.get("score", 0)
@@ -325,7 +343,7 @@ def _source_only_refusal(active_sources: set[str]) -> str:
     selected = ", ".join(sorted(active_sources)) if active_sources else "selected sources"
     return (
         f"I couldn't find that in the selected sources ({selected}).\n\n"
-        "Source-Only Mode is enabled, so I can only answer from the selected documents, database, or FAQ. "
+        "Source-Only Mode is enabled, so I can only answer from the selected documents, database, FAQ, or API snapshots. "
         "Please ask about the uploaded/company data, or enable AI Insights if you want a general answer."
     )
 
@@ -434,14 +452,18 @@ def _format_rows_for_llm(rows: list[dict], max_rows: int = 30) -> str:
 # Search helpers
 # ---------------------------------------------------------------------------
 
-async def _search_faq(db: AsyncSession, company_id: int, question: str) -> list[dict]:
+async def _search_faq(db: AsyncSession, company_id: int, department_ids: list[int], question: str) -> list[dict]:
     q_lower = question.lower()
     keywords = [w for w in q_lower.split() if len(w) > 2 and w not in STOPWORDS]
     if not keywords:
         return []
 
     result = await db.execute(
-        select(FAQItem).where(FAQItem.company_id == company_id, FAQItem.is_published == True)
+        select(FAQItem).where(
+            FAQItem.company_id == company_id,
+            FAQItem.department_id.in_(department_ids),
+            FAQItem.is_published == True,
+        )
     )
     faqs = result.scalars().all()
 
@@ -456,7 +478,7 @@ async def _search_faq(db: AsyncSession, company_id: int, question: str) -> list[
     return matches[:3]
 
 
-async def _search_documents_semantic(db: AsyncSession, company_id: int, question: str) -> list[dict]:
+async def _search_documents_semantic(db: AsyncSession, company_id: int, department_ids: list[int], question: str) -> list[dict]:
     """Semantic search with pgvector first, then JSON/keyword fallbacks."""
     try:
         from app.llm.embeddings.embedding_client import get_embedding, cosine_similarity
@@ -469,6 +491,7 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
         vector_hits = await query_document_chunks(
             db,
             company_id=company_id,
+            department_ids=department_ids,
             query_embedding=query_embedding,
             limit=5,
             min_score=0.5,
@@ -502,7 +525,12 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
         result = await db.execute(
             select(DocumentChunk)
             .join(Document, DocumentChunk.document_id == Document.id)
-            .where(DocumentChunk.company_id == company_id, Document.status == "ready", DocumentChunk.embedding.is_not(None))
+            .where(
+                DocumentChunk.company_id == company_id,
+                DocumentChunk.department_id.in_(department_ids),
+                Document.status == "ready",
+                DocumentChunk.embedding.is_not(None),
+            )
         )
         chunks_with_embeddings = result.scalars().all()
         scored = []
@@ -546,10 +574,11 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
                 "FROM document_chunks dc "
                 "JOIN documents d ON d.id = dc.document_id "
                 "WHERE dc.company_id = :company_id AND d.status = 'ready' "
+                "AND dc.department_id = ANY(:department_ids) "
                 "AND to_tsvector('simple', dc.content) @@ plainto_tsquery('simple', :query) "
                 "ORDER BY rank DESC LIMIT 5"
             ),
-            {"company_id": int(company_id), "query": " ".join(keywords)},
+            {"company_id": int(company_id), "department_ids": department_ids, "query": " ".join(keywords)},
         )
         rows = fts_result.mappings().all()
     except Exception as fts_err:
@@ -577,10 +606,52 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
     return results
 
 
-async def _query_structured_data(db: AsyncSession, company_id: int, question: str) -> dict | None:
+async def _search_api_connectors(db: AsyncSession, company_id: int, department_ids: list[int], question: str) -> list[dict]:
+    q_lower = question.lower()
+    keywords = [w for w in q_lower.split() if len(w) > 2 and w not in STOPWORDS]
+    if not keywords:
+        return []
+
+    result = await db.execute(
+        select(APIConnector).where(
+            APIConnector.company_id == company_id,
+            APIConnector.department_id.in_(department_ids),
+            APIConnector.status == "active",
+            APIConnector.last_response_text.is_not(None),
+        )
+    )
+    connectors = result.scalars().all()
+
+    matches = []
+    for connector in connectors:
+        response_text = connector.last_response_text or ""
+        combined = " ".join(
+            part for part in (connector.name, connector.description or "", response_text) if part
+        ).lower()
+        score = sum(1 for kw in keywords if kw in combined)
+        if score > 0:
+            matches.append({
+                "id": connector.id,
+                "name": connector.name,
+                "department_id": connector.department_id,
+                "status_code": connector.last_status_code,
+                "synced_at": connector.last_synced_at.isoformat() if connector.last_synced_at else None,
+                "content": response_text[:1200],
+                "score": score,
+            })
+
+    matches.sort(key=lambda item: item["score"], reverse=True)
+    return matches[:3]
+
+
+async def _query_structured_data(db: AsyncSession, company_id: int, department_ids: list[int], question: str) -> dict | None:
     """Text-to-SQL with sample rows for context and graceful error handling."""
     result = await db.execute(
-        select(Dataset).where(Dataset.company_id == company_id, Dataset.is_queryable == True)
+        select(Dataset).where(
+            Dataset.company_id == company_id,
+            Dataset.department_id.in_(department_ids),
+            Dataset.is_queryable == True,
+        )
     )
     datasets = result.scalars().all()
     if not datasets:

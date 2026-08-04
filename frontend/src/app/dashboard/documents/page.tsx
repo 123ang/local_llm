@@ -7,6 +7,8 @@ import { useCompanyId } from "@/hooks/useCompanyId";
 export default function DocumentsPage() {
   const companyId = useCompanyId();
   const [docs, setDocs] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [departmentId, setDepartmentId] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [reprocessing, setReprocessing] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -30,18 +32,47 @@ export default function DocumentsPage() {
     return () => { if (pollRef.current) clearTimeout(pollRef.current); };
   }, [companyId, loadDocs]);
 
+  useEffect(() => {
+    if (!companyId) return;
+    api.getDepartments(companyId).then((items) => {
+      setDepartments(items);
+      setDepartmentId((current) => current ?? items[0]?.id ?? null);
+    }).catch(() => {
+      setDepartments([]);
+      setDepartmentId(null);
+    });
+  }, [companyId]);
+
+  useEffect(() => {
+    if (!uploading) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("beforeunload", warnBeforeLeaving);
+    };
+  }, [uploading]);
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !companyId) return;
+    if (!file || !companyId || !departmentId) return;
     setUploading(true);
     try {
-      await api.uploadDocument(companyId, file);
+      await api.uploadDocument(companyId, file, departmentId);
       await loadDocs();
     } catch (err: any) {
       alert(err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
     }
-    setUploading(false);
-    if (fileRef.current) fileRef.current.value = "";
   };
 
   const handleReprocess = async (docId: number) => {
@@ -86,21 +117,52 @@ export default function DocumentsPage() {
 
   if (!companyId)
     return (
-      <div className="text-slate-400 text-center py-12">Select a company to manage documents</div>
+      <div className="text-slate-400 text-center py-12">Select an organization to manage documents</div>
+    );
+
+  if (departments.length === 0)
+    return (
+      <div className="text-slate-400 text-center py-12">No department access assigned yet.</div>
     );
 
   const processingCount = docs.filter((d) => d.status === "pending" || d.status === "processing").length;
 
   return (
     <div className="space-y-6">
+      {uploading && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-[1px] cursor-wait"
+          role="status"
+          aria-live="assertive"
+          aria-busy="true"
+        >
+          <div className="w-[min(90vw,360px)] rounded-lg border border-slate-200 bg-white px-6 py-7 text-center shadow-2xl">
+            <Loader2 size={32} className="mx-auto animate-spin text-red-600" aria-hidden="true" />
+            <h2 className="mt-4 text-base font-semibold text-slate-900">Uploading document</h2>
+            <p className="mt-2 text-sm leading-5 text-slate-600">
+              Please keep this page open until the upload completes.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Documents</h1>
           <p className="text-slate-500 mt-1">
-            Upload PDFs — they are automatically parsed, chunked, and embedded for semantic search.
+            Upload PDFs or Word documents so they can be parsed, indexed, and searched from the assistant.
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <select
+            value={departmentId ?? ""}
+            onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
+            className="px-3 py-2.5 border border-slate-300 rounded-lg text-sm bg-white"
+          >
+            {departments.map((department) => (
+              <option key={department.id} value={department.id}>{department.name}</option>
+            ))}
+          </select>
           {processingCount > 0 && (
             <span className="flex items-center gap-1.5 text-sm text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg">
               <Loader2 size={13} className="animate-spin" />
@@ -109,8 +171,8 @@ export default function DocumentsPage() {
           )}
           <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium cursor-pointer transition-colors">
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            {uploading ? "Uploading…" : "Upload PDF"}
-            <input ref={fileRef} type="file" accept=".pdf" className="hidden" onChange={handleUpload} disabled={uploading} />
+            {uploading ? "Uploading…" : "Upload Document"}
+            <input ref={fileRef} type="file" accept=".pdf,.docx" className="hidden" onChange={handleUpload} disabled={uploading || !departmentId} />
           </label>
         </div>
       </div>
@@ -121,6 +183,7 @@ export default function DocumentsPage() {
             <tr>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Document</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Department</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Pages</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Chunks</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Size</th>
@@ -141,6 +204,9 @@ export default function DocumentsPage() {
                 </td>
                 <td className="px-6 py-4">
                   <StatusBadge status={doc.status} errorMessage={doc.error_message} />
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-600">
+                  {departments.find((department) => department.id === doc.department_id)?.name || "—"}
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-600">{doc.page_count || "—"}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{doc.chunk_count || 0}</td>
@@ -179,17 +245,16 @@ export default function DocumentsPage() {
         </table>
         {docs.length === 0 && (
           <div className="text-center py-12 text-slate-400">
-            No documents uploaded yet. Upload a PDF to get started.
+            No documents uploaded yet. Upload a PDF or Word document to get started.
           </div>
         )}
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
-        <strong>How PDF processing works:</strong> After uploading, the file is automatically parsed into pages,
-        split into overlapping chunks (~800 chars), and each chunk is embedded using{" "}
-        <code className="bg-blue-100 px-1 rounded">nomic-embed-text</code> via Ollama.
-        When you ask a question in the Assistant, the most semantically similar chunks are retrieved and fed to the LLM.
-        Processing time depends on the PDF size — a 10-page document takes ~30 seconds.
+        <strong>How document processing works:</strong> After uploading, the file is automatically parsed,
+        split into overlapping chunks, and indexed for semantic retrieval.
+        When you ask a question in the Assistant, the most relevant chunks are retrieved and sent to the AI engine.
+        Processing time depends on the document size.
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ class FAQItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True, index=True)
+    visibility = Column(String(50), default="department", nullable=False)
     question = Column(Text, nullable=False)
     answer = Column(Text, nullable=False)
     category = Column(String(255), nullable=True)

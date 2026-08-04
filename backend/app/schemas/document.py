@@ -5,6 +5,8 @@ from datetime import datetime
 class DocumentOut(BaseModel):
     id: int
     company_id: int
+    department_id: int | None = None
+    visibility: str = "department"
     filename: str
     original_name: str
     file_size: int | None = None

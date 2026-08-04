@@ -1,19 +1,25 @@
 "use client";
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { useAuth } from "@/lib/auth-context";
+import { canAccessDashboardPath, getDefaultDashboardPath } from "@/lib/navigation-policy";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
+      return;
     }
-  }, [user, loading, router]);
+    if (!loading && user && !canAccessDashboardPath(user.role, pathname)) {
+      router.replace(getDefaultDashboardPath(user.role));
+    }
+  }, [user, loading, pathname, router]);
 
   if (loading) {
     return (
@@ -23,7 +29,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     );
   }
 
-  if (!user) return null;
+  if (!user || !canAccessDashboardPath(user.role, pathname)) return null;
 
   return (
     <div className="flex min-h-screen bg-slate-50">

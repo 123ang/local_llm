@@ -2,6 +2,7 @@ import re
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.company import Company
+from app.models.department import Department
 from app.models.user import User
 
 def _slugify(name: str) -> str:
@@ -22,6 +23,16 @@ async def create_company(db: AsyncSession, name: str, description: str | None = 
     
     company = Company(name=name, slug=slug, description=description)
     db.add(company)
+    await db.flush()
+    db.add(
+        Department(
+            company_id=company.id,
+            name="General",
+            slug="general",
+            description="Default department",
+            is_active=True,
+        )
+    )
     await db.commit()
     await db.refresh(company)
     return company

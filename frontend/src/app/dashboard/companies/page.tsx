@@ -1,13 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { Building2, Plus, X, ToggleLeft, ToggleRight, Settings, Save } from "lucide-react";
 import { api } from "@/lib/api";
 
-const SOURCE_OPTIONS = ["database", "documents", "faq"];
+const SOURCE_OPTIONS = ["database", "documents", "faq", "apis"];
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<any[]>([]);
+  const [departmentsByCompany, setDepartmentsByCompany] = useState<Record<number, any[]>>({});
   const [showForm, setShowForm] = useState(false);
+  const [departmentForm, setDepartmentForm] = useState<{ company_id: number | null; name: string; description: string }>({ company_id: null, name: "", description: "" });
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +20,18 @@ export default function CompaniesPage() {
   useEffect(() => { loadCompanies(); }, []);
 
   const loadCompanies = async () => {
-    try { setCompanies(await api.getCompanies()); } catch {}
+    try {
+      const items = await api.getCompanies();
+      setCompanies(items);
+      const pairs = await Promise.all(items.map(async (company: any) => {
+        try {
+          return [company.id, await api.getDepartments(company.id)] as const;
+        } catch {
+          return [company.id, []] as const;
+        }
+      }));
+      setDepartmentsByCompany(Object.fromEntries(pairs));
+    } catch {}
   };
 
   const handleCreate = async () => {
@@ -77,16 +90,29 @@ export default function CompaniesPage() {
     });
   };
 
+  const createDepartment = async () => {
+    if (!departmentForm.company_id || !departmentForm.name) return;
+    try {
+      await api.createDepartment({
+        company_id: departmentForm.company_id,
+        name: departmentForm.name,
+        description: departmentForm.description || undefined,
+      });
+      setDepartmentForm({ company_id: null, name: "", description: "" });
+      await loadCompanies();
+    } catch {}
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-slate-900">Companies</h1><p className="text-slate-500 mt-1">Manage company tenants</p></div>
-        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"><Plus size={16} /> Add Company</button>
+        <div><h1 className="text-2xl font-bold text-slate-900">Organizations</h1><p className="text-slate-500 mt-1">Manage organization and department workspaces</p></div>
+        <button onClick={() => setShowForm(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"><Plus size={16} /> Add Organization</button>
       </div>
 
       {showForm && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4"><h2 className="text-lg font-semibold">New Company</h2><button onClick={() => setShowForm(false)} className="text-slate-400"><X size={20} /></button></div>
+          <div className="flex items-center justify-between mb-4"><h2 className="text-lg font-semibold">New Organization</h2><button onClick={() => setShowForm(false)} className="text-slate-400"><X size={20} /></button></div>
           <div className="flex gap-4 items-end">
             <div className="flex-1"><label className="block text-sm font-medium text-slate-700 mb-1">Name</label><input value={name} onChange={e => setName(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" /></div>
             <div className="flex-1"><label className="block text-sm font-medium text-slate-700 mb-1">Description</label><input value={description} onChange={e => setDescription(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" /></div>
@@ -99,7 +125,7 @@ export default function CompaniesPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">AI Settings — {settingsCompany.name}</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Knowledge Settings — {settingsCompany.name}</h2>
               <p className="text-sm text-slate-500">Super admin only. These settings control source-only behavior and evidence requirements.</p>
             </div>
             <button onClick={() => setSettingsCompany(null)} className="text-slate-400"><X size={20} /></button>
@@ -134,7 +160,7 @@ export default function CompaniesPage() {
                 </div>
               </div>
               <label className="rounded-lg border border-slate-200 p-3 text-sm">
-                <span className="font-medium text-slate-700">Minimum PDF relevance</span>
+                <span className="font-medium text-slate-700">Minimum document relevance</span>
                 <input type="number" min="0" max="1" step="0.01" value={aiSettings.min_document_relevance} onChange={e => setAiSettings({ ...aiSettings, min_document_relevance: e.target.value })} className="mt-2 w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
                 <span className="text-xs text-slate-400">Recommended: 0.60 for Source Only mode.</span>
               </label>
@@ -151,7 +177,7 @@ export default function CompaniesPage() {
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <table className="w-full">
           <thead className="bg-slate-50 border-b border-slate-200"><tr>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Company</th>
+            <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Organization</th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Slug</th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Created</th>
@@ -159,7 +185,8 @@ export default function CompaniesPage() {
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
             {companies.map(c => (
-              <tr key={c.id} className="hover:bg-slate-50">
+              <Fragment key={c.id}>
+              <tr className="hover:bg-slate-50">
                 <td className="px-6 py-4 flex items-center gap-3"><Building2 size={18} className="text-red-500" /><span className="text-sm font-medium text-slate-900">{c.name}</span></td>
                 <td className="px-6 py-4 text-sm text-slate-500">{c.slug}</td>
                 <td className="px-6 py-4"><span className={`px-2 py-1 text-xs font-medium rounded-full ${c.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{c.is_active ? "Active" : "Inactive"}</span></td>
@@ -171,10 +198,48 @@ export default function CompaniesPage() {
                   </div>
                 </td>
               </tr>
+              <tr className="bg-slate-50/60">
+                <td colSpan={5} className="px-6 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold uppercase text-slate-400">Departments</span>
+                    {(departmentsByCompany[c.id] || []).map((department) => (
+                      <span key={department.id} className="px-2.5 py-1 rounded-full bg-white border border-slate-200 text-xs text-slate-700">
+                        {department.name}
+                      </span>
+                    ))}
+                    {departmentForm.company_id === c.id ? (
+                      <div className="flex items-center gap-2 ml-2">
+                        <input
+                          value={departmentForm.name}
+                          onChange={(e) => setDepartmentForm({ ...departmentForm, name: e.target.value })}
+                          placeholder="Department name"
+                          className="px-2 py-1 border border-slate-300 rounded-md text-xs"
+                        />
+                        <input
+                          value={departmentForm.description}
+                          onChange={(e) => setDepartmentForm({ ...departmentForm, description: e.target.value })}
+                          placeholder="Description"
+                          className="px-2 py-1 border border-slate-300 rounded-md text-xs"
+                        />
+                        <button onClick={createDepartment} className="px-2.5 py-1 rounded-md bg-red-600 text-white text-xs font-medium">Add</button>
+                        <button onClick={() => setDepartmentForm({ company_id: null, name: "", description: "" })} className="px-2.5 py-1 rounded-md border border-slate-300 text-xs text-slate-600">Cancel</button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setDepartmentForm({ company_id: c.id, name: "", description: "" })}
+                        className="px-2.5 py-1 rounded-md border border-slate-300 bg-white text-xs font-medium text-slate-600 hover:text-red-600"
+                      >
+                        + Department
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+              </Fragment>
             ))}
           </tbody>
         </table>
-        {companies.length === 0 && <div className="text-center py-12 text-slate-400">No companies yet</div>}
+        {companies.length === 0 && <div className="text-center py-12 text-slate-400">No organizations yet</div>}
       </div>
     </div>
   );

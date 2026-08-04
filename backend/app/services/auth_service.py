@@ -2,11 +2,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.models.user import User
+from app.models.department import UserDepartmentAccess
 from app.core.security import hash_password, verify_password, create_access_token
 
 async def authenticate_user(db: AsyncSession, email: str, password: str) -> User | None:
     result = await db.execute(
-        select(User).options(selectinload(User.company)).where(User.email == email)
+        select(User)
+        .options(
+            selectinload(User.company),
+            selectinload(User.department_access).selectinload(UserDepartmentAccess.department),
+        )
+        .where(User.email == email)
     )
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.hashed_password):

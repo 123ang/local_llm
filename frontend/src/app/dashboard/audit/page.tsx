@@ -2,9 +2,10 @@
 import { useState, useEffect } from "react";
 import { RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
+import type { AuditLog } from "@/lib/types";
 
 export default function AuditPage() {
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => { loadLogs(); }, []);
@@ -28,6 +29,8 @@ export default function AuditPage() {
     return <span className={`px-2 py-1 text-xs font-medium rounded-full ${colors[action] || "bg-slate-100 text-slate-600"}`}>{action.replace(/_/g, " ")}</span>;
   };
 
+  const display = (value?: string | null) => value?.trim() || "—";
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -42,18 +45,21 @@ export default function AuditPage() {
           <thead className="bg-slate-50 border-b border-slate-200"><tr>
             <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Time</th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Action</th>
+            <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">User</th>
+            <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Organization</th>
             <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Resource</th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">User ID</th>
-            <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Company ID</th>
           </tr></thead>
           <tbody className="divide-y divide-slate-100">
             {logs.map(log => (
               <tr key={log.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4 text-sm text-slate-500">{new Date(log.created_at).toLocaleString()}</td>
                 <td className="px-6 py-4">{actionBadge(log.action)}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{log.resource_type ? `${log.resource_type} #${log.resource_id}` : "—"}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{log.user_id || "—"}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{log.company_id || "—"}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{display(log.actor_label || log.user_name || log.user_email)}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">{display(log.organization_name || log.company_name)}</td>
+                <td className="px-6 py-4 text-sm text-slate-600">
+                  <div className="font-medium text-slate-700">{display(log.resource_label)}</div>
+                  {log.resource_kind_label && <div className="mt-0.5 text-xs text-slate-400">{log.resource_kind_label}</div>}
+                </td>
               </tr>
             ))}
           </tbody>

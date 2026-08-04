@@ -3,151 +3,133 @@ const path = require("node:path");
 
 const { chromium } = require("playwright");
 
-const FRONTEND_URL = "http://127.0.0.1:3000";
-const BACKEND_LOGIN_URL = "http://127.0.0.1:8000/api/auth/login";
-const COMPANIES_URL = "http://127.0.0.1:8000/api/companies";
-const OUTPUT_DIR = "/Users/123ang/andai-runtime/local_llm/docs/assets/manual_screenshots";
-const EMAIL = process.env.ASKAI_ADMIN_EMAIL;
-const PASSWORD = process.env.ASKAI_ADMIN_PASSWORD;
+const FRONTEND_URL = process.env.ASKAI_FRONTEND_URL || "http://127.0.0.1:3000";
+const BACKEND_URL = process.env.ASKAI_BACKEND_URL || "http://127.0.0.1:8000";
+const OUTPUT_DIR = path.join(__dirname, "docs/assets/manual_screenshots");
+const CAPTURE_COMPANY = process.env.ASKAI_CAPTURE_COMPANY || "RBAC QA Organization";
 
-if (!EMAIL || !PASSWORD) {
-  throw new Error("Set ASKAI_ADMIN_EMAIL and ASKAI_ADMIN_PASSWORD before capturing screenshots");
+function credentials(prefix) {
+  const email = process.env[`${prefix}_EMAIL`];
+  const password = process.env[`${prefix}_PASSWORD`];
+  if (!email || !password) {
+    throw new Error(`Set ${prefix}_EMAIL and ${prefix}_PASSWORD before capturing screenshots`);
+  }
+  return { email, password };
 }
 
-async function login() {
-  const response = await fetch(BACKEND_LOGIN_URL, {
+const ACCOUNTS = {
+  superAdmin: credentials("ASKAI_SUPER_ADMIN"),
+  orgAdmin: credentials("ASKAI_ORG_ADMIN"),
+  user: credentials("ASKAI_USER"),
+};
+
+async function login({ email, password }) {
+  const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      username: EMAIL,
-      password: PASSWORD,
-    }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: email, password }),
   });
 
   if (!response.ok) {
-    throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+    throw new Error(`Login failed for ${email}: ${response.status} ${response.statusText}`);
   }
-
   return response.json();
 }
 
-async function getCompanies(token) {
-  const response = await fetch(COMPANIES_URL, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+async function selectedCompanyId(auth) {
+  if (auth.user.company_id) return auth.user.company_id;
+
+  const response = await fetch(`${BACKEND_URL}/api/companies`, {
+    headers: { Authorization: `Bearer ${auth.access_token}` },
   });
+  if (!response.ok) throw new Error(`Unable to load organizations: ${response.status}`);
 
-  if (!response.ok) {
-    return [];
-  }
-
-  return response.json();
+  const companies = await response.json();
+  const selected = companies.find((company) => company.name === CAPTURE_COMPANY) || companies[0];
+  if (!selected) throw new Error("No organization is available for Full Admin screenshots");
+  return selected.id;
 }
 
-async function ensureLoaded(page, headingText) {
+async function authenticatedPage(browser, account) {
+  const auth = await login(account);
+  const companyId = await selectedCompanyId(auth);
+  const context = await browser.newContext({
+    viewport: { width: 1600, height: 1200 },
+    deviceScaleFactor: 1,
+  });
+  await context.addInitScript(
+    ({ token, user, selectedCompany }) => {
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("askai_selected_company_id", String(selectedCompany));
+    },
+    { token: auth.access_token, user: auth.user, selectedCompany: companyId }
+  );
+  return { context, page: await context.newPage(), user: auth.user };
+}
+
+async function capture(page, route, fileName, ready) {
+  await page.goto(`${FRONTEND_URL}${route}`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle");
-  if (headingText) {
-    await page.getByRole("heading", { name: headingText }).waitFor({ timeout: 20000 });
+  if (ready.kind === "heading") {
+    await page.getByRole("heading", { name: ready.name, exact: false }).first().waitFor({ timeout: 20000 });
+  } else {
+    await page.getByPlaceholder(ready.name).waitFor({ timeout: 20000 });
   }
-  await page.waitForTimeout(1200);
-}
-
-async function capture(page, targetPath, options = {}) {
-  await fs.mkdir(path.dirname(targetPath), { recursive: true });
-  await page.screenshot({
-    path: targetPath,
-    fullPage: options.fullPage ?? true,
-  });
-  console.log(`Captured ${targetPath}`);
+  await page.waitForTimeout(700);
+  const target = path.join(OUTPUT_DIR, fileName);
+  await page.screenshot({ path: target, fullPage: false });
+  console.log(`Captured ${fileName}`);
 }
 
 async function main() {
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
+  const browser = await chromium.launch({ headless: true, channel: "chrome" });
 
-  const { access_token: token, user } = await login();
-  const companies = await getCompanies(token);
-  const firstCompany = companies[0] || null;
+  try {
+    const publicContext = await browser.newContext({
+      viewport: { width: 1600, height: 1200 },
+      deviceScaleFactor: 1,
+    });
+    const publicPage = await publicContext.newPage();
+    await capture(publicPage, "/login", "01-login.png", { kind: "placeholder", name: "admin@askai.local" });
+    await publicContext.close();
 
-  const browser = await chromium.launch({
-    headless: true,
-    channel: "chrome",
-  });
+    const fullAdmin = await authenticatedPage(browser, ACCOUNTS.superAdmin);
+    await capture(fullAdmin.page, "/dashboard", "02-full-admin-overview.png", { kind: "heading", name: "Welcome back" });
+    await capture(fullAdmin.page, "/dashboard/companies", "03-full-admin-organizations.png", { kind: "heading", name: "Organizations" });
+    await capture(fullAdmin.page, "/dashboard/users", "04-full-admin-users.png", { kind: "heading", name: "Users" });
+    await capture(fullAdmin.page, "/dashboard/audit", "05-full-admin-audit-logs.png", { kind: "heading", name: "Audit Logs" });
+    await fullAdmin.context.close();
 
-  const context = await browser.newContext({
-    viewport: { width: 1600, height: 1200 },
-    deviceScaleFactor: 2,
-  });
+    const orgAdmin = await authenticatedPage(browser, ACCOUNTS.orgAdmin);
+    await capture(orgAdmin.page, "/dashboard", "06-org-admin-overview.png", { kind: "heading", name: "Welcome back" });
+    await capture(orgAdmin.page, "/dashboard/documents", "07-org-admin-documents.png", { kind: "heading", name: "Documents" });
+    await capture(orgAdmin.page, "/dashboard/faq", "08-org-admin-faq.png", { kind: "heading", name: "FAQ" });
+    await capture(orgAdmin.page, "/dashboard/database", "09-org-admin-database.png", { kind: "heading", name: "Database" });
+    await orgAdmin.page.getByRole("button", { name: "Upload Table & Data" }).click();
+    await orgAdmin.page.waitForTimeout(700);
+    await orgAdmin.page.screenshot({ path: path.join(OUTPUT_DIR, "10-org-admin-database-upload.png"), fullPage: false });
+    console.log("Captured 10-org-admin-database-upload.png");
+    await capture(orgAdmin.page, "/dashboard/evaluations", "11-org-admin-evaluations.png", { kind: "heading", name: "Evaluation Tests" });
+    await capture(orgAdmin.page, "/dashboard/analytics", "12-org-admin-analytics.png", { kind: "heading", name: "Usage Analytics" });
+    await capture(orgAdmin.page, "/dashboard/users", "13-org-admin-users.png", { kind: "heading", name: "Users" });
+    await capture(orgAdmin.page, "/dashboard/audit", "14-org-admin-audit-logs.png", { kind: "heading", name: "Audit Logs" });
+    await orgAdmin.context.close();
 
-  const page = await context.newPage();
-
-  // 01 Login page
-  await page.goto(`${FRONTEND_URL}/login`, { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle");
-  await page.waitForTimeout(1200);
-  await capture(page, `${OUTPUT_DIR}/01-login.png`);
-
-  // Seed local auth + company selection for the protected pages.
-  await page.evaluate(
-    ({ token: authToken, authUser, companyId }) => {
-      localStorage.setItem("token", authToken);
-      localStorage.setItem("user", JSON.stringify(authUser));
-      if (companyId) {
-        localStorage.setItem("askai_selected_company_id", String(companyId));
-      }
-    },
-    { token, authUser: user, companyId: firstCompany ? firstCompany.id : user.company_id }
-  );
-
-  // 02 Overview
-  await page.goto(`${FRONTEND_URL}/dashboard`, { waitUntil: "domcontentloaded" });
-  await ensureLoaded(page, "Welcome back, " + user.full_name);
-  await capture(page, `${OUTPUT_DIR}/02-overview.png`);
-
-  // 03 Assistant
-  await page.goto(`${FRONTEND_URL}/dashboard/assistant`, { waitUntil: "domcontentloaded" });
-  await page.getByPlaceholder("Ask about your data, documents, or policies...").waitFor({ timeout: 20000 });
-  await page.waitForTimeout(1200);
-  await capture(page, `${OUTPUT_DIR}/03-assistant.png`);
-
-  // 04 Documents
-  await page.goto(`${FRONTEND_URL}/dashboard/documents`, { waitUntil: "domcontentloaded" });
-  await ensureLoaded(page, "Documents");
-  await capture(page, `${OUTPUT_DIR}/04-documents.png`);
-
-  // 05 FAQ
-  await page.goto(`${FRONTEND_URL}/dashboard/faq`, { waitUntil: "domcontentloaded" });
-  await ensureLoaded(page, "FAQ");
-  await capture(page, `${OUTPUT_DIR}/05-faq.png`);
-
-  // 06 Database tables
-  await page.goto(`${FRONTEND_URL}/dashboard/database`, { waitUntil: "domcontentloaded" });
-  await ensureLoaded(page, "Database");
-  await capture(page, `${OUTPUT_DIR}/06-database-tables.png`);
-
-  // 07 Database upload tab
-  await page.getByRole("button", { name: "Upload Table & Data" }).click();
-  await page.waitForTimeout(1200);
-  await capture(page, `${OUTPUT_DIR}/07-database-upload.png`);
-
-  // 08 Companies
-  await page.goto(`${FRONTEND_URL}/dashboard/companies`, { waitUntil: "domcontentloaded" });
-  await ensureLoaded(page, "Companies");
-  await capture(page, `${OUTPUT_DIR}/08-companies.png`);
-
-  // 09 Users
-  await page.goto(`${FRONTEND_URL}/dashboard/users`, { waitUntil: "domcontentloaded" });
-  await ensureLoaded(page, "Users");
-  await capture(page, `${OUTPUT_DIR}/09-users.png`);
-
-  // 10 Audit Logs
-  await page.goto(`${FRONTEND_URL}/dashboard/audit`, { waitUntil: "domcontentloaded" });
-  await ensureLoaded(page, "Audit Logs");
-  await capture(page, `${OUTPUT_DIR}/10-audit-logs.png`);
-
-  await browser.close();
+    const normalUser = await authenticatedPage(browser, ACCOUNTS.user);
+    await capture(normalUser.page, "/dashboard/assistant", "15-normal-user-assistant.png", {
+      kind: "placeholder",
+      name: "Ask about your data, documents, or policies...",
+    });
+    const forbiddenLabel = normalUser.page.getByText("Documents", { exact: true });
+    if (await forbiddenLabel.count()) {
+      throw new Error("Normal User screenshot unexpectedly exposes administration navigation");
+    }
+    await normalUser.context.close();
+  } finally {
+    await browser.close();
+  }
 }
 
 main().catch((error) => {

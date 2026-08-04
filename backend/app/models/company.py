@@ -18,5 +18,7 @@ class Company(Base):
     documents = relationship("Document", back_populates="company", cascade="all, delete-orphan")
     faq_items = relationship("FAQItem", back_populates="company", cascade="all, delete-orphan")
     datasets = relationship("Dataset", back_populates="company", cascade="all, delete-orphan")
+    api_connectors = relationship("APIConnector", back_populates="company", cascade="all, delete-orphan")
     chat_sessions = relationship("ChatSession", back_populates="company", cascade="all, delete-orphan")
     ai_settings = relationship("CompanyAISettings", back_populates="company", cascade="all, delete-orphan", uselist=False)
+    departments = relationship("Department", back_populates="company", cascade="all, delete-orphan")
