@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
 import { canAccessDashboardPath } from "@/lib/navigation-policy";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n-context";
 
 interface SystemStatus {
   ollama: { connected: boolean };
@@ -16,6 +17,7 @@ interface SystemStatus {
 }
 
 export default function OverviewPage() {
+  const { t } = useI18n();
   const { user, isSuperAdmin } = useAuth();
   const companyId = useCompanyId();
 
@@ -61,10 +63,10 @@ export default function OverviewPage() {
   }, [loadCounts]);
 
   const stats = [
-    { label: "Documents", value: counts.documents, icon: FileText, color: "text-blue-600", bg: "bg-blue-50", href: "/dashboard/documents" },
-    { label: "FAQ Items", value: counts.faq, icon: HelpCircle, color: "text-amber-600", bg: "bg-amber-50", href: "/dashboard/faq" },
-    { label: "Datasets", value: counts.datasets, icon: Database, color: "text-emerald-600", bg: "bg-emerald-50", href: "/dashboard/database" },
-    { label: "Chat Sessions", value: counts.sessions, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-50", href: "/dashboard/assistant" },
+    { label: t("overview.documents"), value: counts.documents, icon: FileText, color: "text-blue-600", bg: "bg-blue-50", href: "/dashboard/documents" },
+    { label: t("overview.faqItems"), value: counts.faq, icon: HelpCircle, color: "text-amber-600", bg: "bg-amber-50", href: "/dashboard/faq" },
+    { label: t("overview.datasets"), value: counts.datasets, icon: Database, color: "text-emerald-600", bg: "bg-emerald-50", href: "/dashboard/database" },
+    { label: t("overview.chatSessions"), value: counts.sessions, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-50", href: "/dashboard/assistant" },
   ];
 
   const StatusDot = ({ ok, loading }: { ok: boolean; loading?: boolean }) => {
@@ -75,8 +77,8 @@ export default function OverviewPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.full_name}</h1>
-        <p className="text-slate-500 mt-1">Here&apos;s an overview of your knowledge platform</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t("overview.welcome", { name: user?.full_name })}</h1>
+        <p className="text-slate-500 mt-1">{t("overview.copy")}</p>
       </div>
 
       {/* Stats */}
@@ -114,7 +116,7 @@ export default function OverviewPage() {
         {/* Quick Start */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">
-            {isSuperAdmin ? "Platform Management" : "Quick Start"}
+            {t(isSuperAdmin ? "overview.platformManagement" : "overview.quickStart")}
           </h2>
           <div className="space-y-3">
             {isSuperAdmin ? (
@@ -123,16 +125,16 @@ export default function OverviewPage() {
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
                   <div className="p-2 rounded-lg bg-red-50"><Database size={18} className="text-red-600" /></div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Manage Organizations</p>
-                    <p className="text-xs text-slate-500">Set up departments, tenants, and AI source rules</p>
+                    <p className="text-sm font-medium text-slate-900">{t("overview.manageOrganizations")}</p>
+                    <p className="text-xs text-slate-500">{t("overview.manageOrganizationsCopy")}</p>
                   </div>
                 </Link>
                 <Link href="/dashboard/users"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
                   <div className="p-2 rounded-lg bg-blue-50"><MessageSquare size={18} className="text-blue-600" /></div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Assign Users</p>
-                    <p className="text-xs text-slate-500">Place users into the correct organization</p>
+                    <p className="text-sm font-medium text-slate-900">{t("overview.assignUsers")}</p>
+                    <p className="text-xs text-slate-500">{t("overview.assignUsersCopy")}</p>
                   </div>
                 </Link>
               </>
@@ -142,24 +144,24 @@ export default function OverviewPage() {
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
                   <div className="p-2 rounded-lg bg-red-50"><MessageSquare size={18} className="text-red-600" /></div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Ask a Question</p>
-                    <p className="text-xs text-slate-500">Chat with your knowledge base</p>
+                    <p className="text-sm font-medium text-slate-900">{t("overview.askQuestion")}</p>
+                    <p className="text-xs text-slate-500">{t("overview.askQuestionCopy")}</p>
                   </div>
                 </Link>
                 <Link href="/dashboard/documents"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
                   <div className="p-2 rounded-lg bg-blue-50"><FileText size={18} className="text-blue-600" /></div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Upload Document</p>
-                    <p className="text-xs text-slate-500">Add PDFs to your knowledge base</p>
+                    <p className="text-sm font-medium text-slate-900">{t("overview.uploadDocument")}</p>
+                    <p className="text-xs text-slate-500">{t("overview.uploadDocumentCopy")}</p>
                   </div>
                 </Link>
                 <Link href="/dashboard/database"
                   className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
                   <div className="p-2 rounded-lg bg-emerald-50"><Database size={18} className="text-emerald-600" /></div>
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Import Data</p>
-                    <p className="text-xs text-slate-500">Upload CSV or create tables</p>
+                    <p className="text-sm font-medium text-slate-900">{t("overview.importData")}</p>
+                    <p className="text-xs text-slate-500">{t("overview.importDataCopy")}</p>
                   </div>
                 </Link>
               </>
@@ -170,8 +172,9 @@ export default function OverviewPage() {
         {/* System Status */}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">System Status</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{t("overview.systemStatus")}</h2>
             <button onClick={loadStatus} disabled={statusLoading}
+              aria-label={t("common.refresh")}
               className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
               <RefreshCw size={15} className={statusLoading ? "animate-spin" : ""} />
             </button>
@@ -179,105 +182,105 @@ export default function OverviewPage() {
           <div className="space-y-4">
             {/* Backend */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Backend API</span>
+              <span className="text-sm text-slate-600">{t("overview.backendApi")}</span>
               <span className="flex items-center gap-1.5 text-sm text-emerald-600">
-                <StatusDot ok={true} /> Online
+                <StatusDot ok={true} /> {t("common.online")}
               </span>
             </div>
 
             {/* AI engine */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">AI Engine</span>
+              <span className="text-sm text-slate-600">{t("overview.aiEngine")}</span>
               {statusLoading ? (
                 <span className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <StatusDot ok={false} loading /> Checking…
+                  <StatusDot ok={false} loading /> {t("common.checking")}
                 </span>
               ) : status?.ollama.connected ? (
                 <div className="flex flex-col items-end gap-0.5">
                   <span className="flex items-center gap-1.5 text-sm text-emerald-600">
-                    <StatusDot ok={true} /> Connected
+                    <StatusDot ok={true} /> {t("common.connected")}
                   </span>
-                  <span className="text-xs text-slate-400">LLM ready</span>
+                  <span className="text-xs text-slate-400">{t("overview.llmReady")}</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-end gap-0.5">
                   <span className="flex items-center gap-1.5 text-sm text-red-500">
-                    <StatusDot ok={false} /> Not connected
+                    <StatusDot ok={false} /> {t("common.notConnected")}
                   </span>
-                  <span className="text-xs text-slate-400">Service unavailable</span>
+                  <span className="text-xs text-slate-400">{t("overview.serviceUnavailable")}</span>
                 </div>
               )}
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Embedding Service</span>
+              <span className="text-sm text-slate-600">{t("overview.embeddingService")}</span>
               {statusLoading ? (
                 <span className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <StatusDot ok={false} loading /> Checking…
+                  <StatusDot ok={false} loading /> {t("common.checking")}
                 </span>
               ) : (
                 <span className={`flex items-center gap-1.5 text-sm ${status?.ollama.connected ? "text-emerald-600" : "text-red-500"}`}>
                   <StatusDot ok={status?.ollama.connected ?? false} />
-                  {status?.ollama.connected ? "Connected" : "Not connected"}
+                  {t(status?.ollama.connected ? "common.connected" : "common.notConnected")}
                 </span>
               )}
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">RAG Service</span>
+              <span className="text-sm text-slate-600">{t("overview.ragService")}</span>
               {statusLoading ? (
                 <span className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <StatusDot ok={false} loading /> Checking…
+                  <StatusDot ok={false} loading /> {t("common.checking")}
                 </span>
               ) : (
                 <span className={`flex items-center gap-1.5 text-sm ${status?.rag.connected ? "text-emerald-600" : "text-red-500"}`}>
                   <StatusDot ok={status?.rag.connected ?? false} />
-                  {status?.rag.connected ? "Running" : "Not connected"}
+                  {t(status?.rag.connected ? "common.running" : "common.notConnected")}
                 </span>
               )}
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">GPU RAM</span>
+              <span className="text-sm text-slate-600">{t("overview.gpuRam")}</span>
               {statusLoading ? (
                 <span className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <StatusDot ok={false} loading /> Checking…
+                  <StatusDot ok={false} loading /> {t("common.checking")}
                 </span>
               ) : status?.gpu.available ? (
                 <span className="text-sm text-emerald-600">
                   {status.gpu.memory_used_mb} / {status.gpu.memory_total_mb} MB
                 </span>
               ) : (
-                <span className="text-sm text-slate-400">Unavailable</span>
+                <span className="text-sm text-slate-400">{t("common.unavailable")}</span>
               )}
             </div>
 
             {/* Database */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Database</span>
+              <span className="text-sm text-slate-600">{t("overview.database")}</span>
               {statusLoading ? (
                 <span className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <StatusDot ok={false} loading /> Checking…
+                  <StatusDot ok={false} loading /> {t("common.checking")}
                 </span>
               ) : (
                 <span className={`flex items-center gap-1.5 text-sm ${status?.database.connected ? "text-emerald-600" : "text-red-500"}`}>
                   <StatusDot ok={status?.database.connected ?? false} />
-                  {status?.database.version || (status?.database.connected ? "Connected" : "Disconnected")}
+                  {status?.database.version || t(status?.database.connected ? "common.connected" : "overview.disconnected")}
                 </span>
               )}
             </div>
 
             {/* Redis */}
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Redis</span>
+              <span className="text-sm text-slate-600">{t("overview.redis")}</span>
               {statusLoading ? (
                 <span className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <StatusDot ok={false} loading /> Checking…
+                  <StatusDot ok={false} loading /> {t("common.checking")}
                 </span>
               ) : (
                 <span className={`flex items-center gap-1.5 text-sm ${status?.redis.connected ? "text-emerald-600" : "text-red-500"}`}>
                   <StatusDot ok={status?.redis.connected ?? false} />
-                  {status?.redis.connected ? "Running" : "Not running"}
+                  {t(status?.redis.connected ? "common.running" : "common.notRunning")}
                 </span>
               )}
             </div>

@@ -1,4 +1,6 @@
+"use client";
 import { BarChart3, BriefcaseBusiness, Copy, Database, Download, FileText, HelpCircle, Lightbulb, Plug, ShieldCheck } from "lucide-react";
+import { useI18n } from "@/lib/i18n-context";
 
 export function MessageContent({ content }: { content: string }) {
   const lines = content.split("\n");
@@ -81,6 +83,7 @@ export function MessageContent({ content }: { content: string }) {
 }
 
 export function DatabaseResultTable({ data }: { data: any }) {
+  const { t } = useI18n();
   if (!data) return null;
   const result = data.result;
   if (!result || typeof result === "string") return null;
@@ -92,7 +95,7 @@ export function DatabaseResultTable({ data }: { data: any }) {
       <summary className="cursor-pointer select-none list-none px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5">
           <Database size={12} className="text-emerald-600" />
-          Show database rows ({result.length})
+          {t("assistant.showDatabaseRows", { count: result.length })}
         </span>
         <span className="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
       </summary>
@@ -119,7 +122,7 @@ export function DatabaseResultTable({ data }: { data: any }) {
         </table>
         {result.length > 20 && (
           <p className="px-3 py-1.5 text-xs text-slate-400 bg-slate-50 border-t border-slate-200">
-            Showing 20 of {result.length} rows
+            {t("assistant.showingRows", { count: result.length })}
           </p>
         )}
       </div>
@@ -158,6 +161,7 @@ function groupDocumentCitations(docs: any[]): any[] {
 }
 
 export function SourceBadges({ sources }: { sources: any }) {
+  const { t } = useI18n();
   if (!sources) return null;
   const docs = sources.documents || [];
   const groupedDocs = groupDocumentCitations(docs);
@@ -175,22 +179,22 @@ export function SourceBadges({ sources }: { sources: any }) {
       <div className="flex flex-wrap gap-2">
         {hasFaq && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200">
-            <HelpCircle size={11} /> {faq.length} FAQ
+            <HelpCircle size={11} /> {t("assistant.faqSummary", { count: faq.length })}
           </span>
         )}
         {hasDocs && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
-            <FileText size={11} /> {docs.length} document passage{docs.length === 1 ? "" : "s"} on {groupedDocs.length} section{groupedDocs.length === 1 ? "" : "s"}
+            <FileText size={11} /> {t("assistant.documentSummary", { passages: docs.length, sections: groupedDocs.length })}
           </span>
         )}
         {hasApis && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-cyan-50 text-cyan-700 text-xs font-medium border border-cyan-200">
-            <Plug size={11} /> {apis.length} API snapshot{apis.length === 1 ? "" : "s"}
+            <Plug size={11} /> {t("assistant.apiSummary", { count: apis.length })}
           </span>
         )}
         {hasDb && (
           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 text-xs font-medium border border-emerald-200">
-            <Database size={11} /> {db.row_count ?? 0} database row{db.row_count === 1 ? "" : "s"}
+            <Database size={11} /> {t("assistant.databaseSummary", { count: db.row_count ?? 0 })}
           </span>
         )}
       </div>
@@ -198,22 +202,22 @@ export function SourceBadges({ sources }: { sources: any }) {
       <details className="group rounded-lg border border-slate-200 bg-white">
         <summary className="cursor-pointer select-none list-none px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 rounded-lg flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck size={12} className="text-slate-500" /> Answer audit trail
+            <ShieldCheck size={12} className="text-slate-500" /> {t("assistant.answerAuditTrail")}
           </span>
           <span className="text-slate-400 group-open:rotate-180 transition-transform">⌄</span>
         </summary>
         <div className="border-t border-slate-200 p-3 space-y-3 text-xs text-slate-600">
           {hasDocs && (
             <div>
-              <div className="font-semibold text-slate-700 mb-1">Documents</div>
+              <div className="font-semibold text-slate-700 mb-1">{t("assistant.documents")}</div>
               <div className="space-y-2">
                 {groupedDocs.map((doc: any, i: number) => (
                   <div key={i} className="rounded-md bg-blue-50 border border-blue-100 p-2">
                     <button type="button" onClick={() => openPdfSource(doc)} className="font-medium text-blue-700 hover:underline text-left">
-                      Source: {doc.source}{doc.page ? `, page ${doc.page}` : ""}
+                      {t("assistant.source")}: {doc.source}{doc.page ? `, ${t("assistant.page")} ${doc.page}` : ""}
                     </button>
-                    <div className="text-blue-600/70 mt-0.5">Used {doc.passage_count} passage{doc.passage_count === 1 ? "" : "s"} from this page</div>
-                    {doc.score !== undefined && <div className="text-blue-600/70 mt-0.5">Relevance: {doc.score}</div>}
+                    <div className="text-blue-600/70 mt-0.5">{t("assistant.usedPassages", { count: doc.passage_count })}</div>
+                    {doc.score !== undefined && <div className="text-blue-600/70 mt-0.5">{t("assistant.relevance")}: {doc.score}</div>}
                     {doc.passages?.slice(0, 2).map((passage: string, idx: number) => (
                       <div key={idx} className="mt-1 text-slate-600 line-clamp-3">"{passage}"</div>
                     ))}
@@ -224,13 +228,13 @@ export function SourceBadges({ sources }: { sources: any }) {
           )}
           {hasDb && (
             <div>
-              <div className="font-semibold text-slate-700 mb-1">Database</div>
+              <div className="font-semibold text-slate-700 mb-1">{t("assistant.database")}</div>
               <div className="rounded-md bg-emerald-50 border border-emerald-100 p-2">
-                <div>Source: {(db.datasets || db.tables || ["Database"]).join(", ")}</div>
-                <div>Rows returned: {db.row_count ?? 0}</div>
+                <div>{t("assistant.source")}: {(db.datasets || db.tables || [t("assistant.database")]).join(", ")}</div>
+                <div>{t("assistant.rowsReturned")}: {db.row_count ?? 0}</div>
                 {db.sql && (
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-emerald-700 font-medium">Show SQL</summary>
+                    <summary className="cursor-pointer text-emerald-700 font-medium">{t("assistant.showSql")}</summary>
                     <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-white p-2 text-[11px] text-slate-600 border border-emerald-100">{db.sql}</pre>
                   </details>
                 )}
@@ -252,12 +256,12 @@ export function SourceBadges({ sources }: { sources: any }) {
           )}
           {hasApis && (
             <div>
-              <div className="font-semibold text-slate-700 mb-1">APIs</div>
+              <div className="font-semibold text-slate-700 mb-1">{t("assistant.apis")}</div>
               <div className="space-y-2">
                 {apis.map((item: any, i: number) => (
                   <div key={i} className="rounded-md bg-cyan-50 border border-cyan-100 p-2">
                     <div className="font-medium text-cyan-700">{item.name}</div>
-                    <div className="text-cyan-600/70 mt-0.5">Status: {item.status_code ?? "—"}</div>
+                    <div className="text-cyan-600/70 mt-0.5">{t("assistant.status")}: {item.status_code ?? "—"}</div>
                     <div className="mt-1 text-slate-600 line-clamp-3">{item.content}</div>
                   </div>
                 ))}
@@ -573,6 +577,7 @@ function sourceSummary(sources: any) {
 }
 
 function NumericResultChart({ data }: { data: any }) {
+  const { t, formatNumber } = useI18n();
   const chart = buildChartRows(data);
   if (!chart) return null;
 
@@ -580,7 +585,7 @@ function NumericResultChart({ data }: { data: any }) {
   return (
     <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
       <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-700">
-        <BarChart3 size={14} className="text-red-500" /> Quick chart: {chart.valueCol}
+        <BarChart3 size={14} className="text-red-500" /> {t("assistant.quickChart", { field: chart.valueCol })}
       </div>
       <div className="space-y-2">
         {chart.chartRows.map((row: any, idx: number) => (
@@ -589,7 +594,7 @@ function NumericResultChart({ data }: { data: any }) {
             <div className="h-2 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.max(4, Math.round(Math.abs(row.value) / max * 100))}%` }} />
             </div>
-            <div className="tabular-nums text-slate-700">{row.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+            <div className="tabular-nums text-slate-700">{formatNumber(row.value, { maximumFractionDigits: 2 })}</div>
           </div>
         ))}
       </div>
@@ -598,6 +603,7 @@ function NumericResultChart({ data }: { data: any }) {
 }
 
 function RecommendationBlock({ content, hasSources }: { content: string; hasSources: boolean }) {
+  const { t } = useI18n();
   const insightLines = content
     .split("\n")
     .map(line => line.trim())
@@ -606,7 +612,7 @@ function RecommendationBlock({ content, hasSources }: { content: string; hasSour
   return (
     <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50 p-3 text-xs text-purple-800">
       <div className="mb-1 flex items-center gap-1.5 font-semibold">
-        <Lightbulb size={13} /> {hasSources ? "Insight / recommended action" : "AI insight"}
+        <Lightbulb size={13} /> {hasSources ? t("assistant.insightAction") : t("assistant.aiInsight")}
       </div>
       <div className="space-y-1">
         {insightLines.map((line, idx) => <p key={idx}>{line}</p>)}
@@ -622,6 +628,7 @@ function hasAiInsightContribution(content: string, sources: any): boolean {
 }
 
 export function ExecutiveAnswerCard({ content, sources }: { content: string; sources: any }) {
+  const { t } = useI18n();
   const hasSources = Boolean(sources?.database || sources?.documents?.length || sources?.faq?.length);
   const hasAiInsight = hasAiInsightContribution(content, sources);
   return (
@@ -629,7 +636,7 @@ export function ExecutiveAnswerCard({ content, sources }: { content: string; sou
       <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Executive answer</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{t("assistant.executiveAnswer")}</div>
             <div className="mt-1 text-sm font-semibold text-slate-900">{extractKeyAnswer(content)}</div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
@@ -637,15 +644,15 @@ export function ExecutiveAnswerCard({ content, sources }: { content: string; sou
               type="button"
               onClick={() => navigator.clipboard?.writeText(content)}
               className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:bg-slate-50"
-              title="Copy answer"
+              title={t("assistant.copyAnswer")}
             >
-              <Copy size={12} /> Copy
+              <Copy size={12} /> {t("assistant.copy")}
             </button>
             <button
               type="button"
               onClick={() => exportAnswerPdf(content, sources)}
               className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100"
-              title="Export answer as PDF"
+              title={t("assistant.exportPdf")}
             >
               <Download size={12} /> PDF
             </button>
@@ -653,7 +660,7 @@ export function ExecutiveAnswerCard({ content, sources }: { content: string; sou
               type="button"
               onClick={() => exportAnswerWord(content, sources)}
               className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-600 hover:bg-blue-100"
-              title="Export answer for Microsoft Word"
+              title={t("assistant.exportWord")}
             >
               <FileText size={12} /> Word
             </button>
@@ -661,22 +668,26 @@ export function ExecutiveAnswerCard({ content, sources }: { content: string; sou
               type="button"
               onClick={() => exportBoardMemo(content, sources)}
               className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-50"
-              title="Export board memo / executive briefing"
+              title={t("assistant.exportBriefing")}
             >
-              <BriefcaseBusiness size={12} /> Briefing
+              <BriefcaseBusiness size={12} /> {t("assistant.briefing")}
             </button>
           </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
           <span className={`rounded-full px-2 py-0.5 ${hasSources ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-500"}`}>
-            {hasSources ? "Evidence-backed" : "No evidence attached"}
+            {hasSources ? t("assistant.evidenceBacked") : t("assistant.noEvidence")}
           </span>
           {hasAiInsight && (
             <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 font-medium text-purple-700">
-              <Lightbulb size={11} /> AI Insight added
+              <Lightbulb size={11} /> {t("assistant.aiInsightAdded")}
             </span>
           )}
-          <span>{sourceSummary(sources)}</span>
+          <span>{t("assistant.sourceSummary", {
+            database: sources?.database?.row_count ?? 0,
+            documents: sources?.documents?.length ?? 0,
+            faq: sources?.faq?.length ?? 0,
+          })}</span>
         </div>
       </div>
       <div className="p-3">

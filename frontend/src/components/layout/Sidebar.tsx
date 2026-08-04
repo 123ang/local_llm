@@ -8,6 +8,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/BrandLogo";
 import { getSidebarSections, SidebarItemKey } from "@/lib/navigation-policy";
+import { useI18n } from "@/lib/i18n-context";
 
 const icons: Record<SidebarItemKey, typeof LayoutDashboard> = {
   overview: LayoutDashboard,
@@ -23,6 +24,7 @@ const icons: Record<SidebarItemKey, typeof LayoutDashboard> = {
 };
 
 export default function Sidebar() {
+  const { t } = useI18n();
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const sections = getSidebarSections(user?.role);
@@ -40,13 +42,13 @@ export default function Sidebar() {
         }`}
       >
         <Icon size={18} />
-        {item.name}
+        {t(`navigation.${item.key}`)}
       </Link>
     );
   };
 
   return (
-    <aside className="w-64 min-h-screen flex flex-col" style={{ background: "#1a1a2e" }}>
+    <aside className="w-64 min-h-screen shrink-0 flex flex-col" style={{ background: "#1a1a2e" }}>
       <div className="p-5 border-b border-white/10">
         <BrandLogo variant="sidebar" />
       </div>
@@ -54,7 +56,7 @@ export default function Sidebar() {
       <nav className="flex-1 p-3 space-y-6 overflow-y-auto">
         {sections.map((section) => (
           <div key={section.label}>
-            <p className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">{section.label}</p>
+            <p className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">{t(`navigation.${section.label.toLowerCase()}`)}</p>
             <div className="space-y-1">
               {section.items.map((item) => <NavItem key={item.href} item={item} />)}
             </div>
@@ -67,7 +69,7 @@ export default function Sidebar() {
           <p className="text-sm font-medium text-white truncate">{user?.full_name}</p>
           <p className="text-xs text-slate-400 truncate">{user?.email}</p>
           <span className="inline-block mt-1 px-2 py-0.5 text-[10px] font-semibold uppercase rounded-full bg-red-600/20 text-red-400">
-            {user?.role?.replace("_", " ")}
+            {t(user?.role === "super_admin" ? "common.superAdmin" : user?.role === "admin" ? "common.admin" : "common.normalUser")}
           </span>
         </div>
         <button
@@ -75,7 +77,7 @@ export default function Sidebar() {
           className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
         >
           <LogOut size={16} />
-          Sign out
+          {t("navigation.signOut")}
         </button>
       </div>
     </aside>

@@ -3,8 +3,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Upload, Trash2, FileText, Loader2, RefreshCw, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
+import { useI18n } from "@/lib/i18n-context";
 
 export default function DocumentsPage() {
+  const { t, formatDate } = useI18n();
   const companyId = useCompanyId();
   const [docs, setDocs] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -68,7 +70,7 @@ export default function DocumentsPage() {
       await api.uploadDocument(companyId, file, departmentId);
       await loadDocs();
     } catch (err: any) {
-      alert(err.message || "Upload failed");
+      alert(err.message || t("documents.uploadFailed"));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -82,13 +84,13 @@ export default function DocumentsPage() {
       await api.request(`/documents/${companyId}/${docId}/reprocess`, { method: "POST" });
       await loadDocs();
     } catch (err: any) {
-      alert(err.message || "Reprocess failed");
+      alert(err.message || t("documents.reprocessFailed"));
     }
     setReprocessing(null);
   };
 
   const handleDelete = async (docId: number) => {
-    if (!companyId || !confirm("Delete this document and all its chunks?")) return;
+    if (!companyId || !confirm(t("documents.confirmDelete"))) return;
     try {
       await api.deleteDocument(companyId, docId);
       setDocs((prev) => prev.filter((d) => d.id !== docId));
@@ -97,10 +99,10 @@ export default function DocumentsPage() {
 
   const StatusBadge = ({ status, errorMessage }: { status: string; errorMessage?: string }) => {
     const configs: Record<string, { cls: string; icon: React.ReactNode; label: string }> = {
-      pending:    { cls: "bg-amber-50 text-amber-700 border border-amber-200",   icon: <Clock size={11} />,        label: "Pending" },
-      processing: { cls: "bg-blue-50 text-blue-700 border border-blue-200",      icon: <Loader2 size={11} className="animate-spin" />, label: "Processing" },
-      ready:      { cls: "bg-emerald-50 text-emerald-700 border border-emerald-200", icon: <CheckCircle size={11} />, label: "Ready" },
-      error:      { cls: "bg-red-50 text-red-700 border border-red-200",          icon: <AlertCircle size={11} />,  label: "Error" },
+      pending:    { cls: "bg-amber-50 text-amber-700 border border-amber-200",   icon: <Clock size={11} />,        label: t("documents.pending") },
+      processing: { cls: "bg-blue-50 text-blue-700 border border-blue-200",      icon: <Loader2 size={11} className="animate-spin" />, label: t("documents.processing") },
+      ready:      { cls: "bg-emerald-50 text-emerald-700 border border-emerald-200", icon: <CheckCircle size={11} />, label: t("documents.ready") },
+      error:      { cls: "bg-red-50 text-red-700 border border-red-200",          icon: <AlertCircle size={11} />,  label: t("documents.error") },
     };
     const cfg = configs[status] || { cls: "bg-slate-100 text-slate-600 border border-slate-200", icon: null, label: status };
     return (
@@ -117,12 +119,12 @@ export default function DocumentsPage() {
 
   if (!companyId)
     return (
-      <div className="text-slate-400 text-center py-12">Select an organization to manage documents</div>
+      <div className="text-slate-400 text-center py-12">{t("documents.selectOrganization")}</div>
     );
 
   if (departments.length === 0)
     return (
-      <div className="text-slate-400 text-center py-12">No department access assigned yet.</div>
+      <div className="text-slate-400 text-center py-12">{t("documents.noDepartment")}</div>
     );
 
   const processingCount = docs.filter((d) => d.status === "pending" || d.status === "processing").length;
@@ -138,9 +140,9 @@ export default function DocumentsPage() {
         >
           <div className="w-[min(90vw,360px)] rounded-lg border border-slate-200 bg-white px-6 py-7 text-center shadow-2xl">
             <Loader2 size={32} className="mx-auto animate-spin text-red-600" aria-hidden="true" />
-            <h2 className="mt-4 text-base font-semibold text-slate-900">Uploading document</h2>
+            <h2 className="mt-4 text-base font-semibold text-slate-900">{t("documents.uploadingTitle")}</h2>
             <p className="mt-2 text-sm leading-5 text-slate-600">
-              Please keep this page open until the upload completes.
+              {t("documents.uploadingCopy")}
             </p>
           </div>
         </div>
@@ -148,9 +150,9 @@ export default function DocumentsPage() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Documents</h1>
+          <h1 className="text-2xl font-bold text-slate-900">{t("documents.title")}</h1>
           <p className="text-slate-500 mt-1">
-            Upload PDFs or Word documents so they can be parsed, indexed, and searched from the assistant.
+            {t("documents.copy")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -166,12 +168,12 @@ export default function DocumentsPage() {
           {processingCount > 0 && (
             <span className="flex items-center gap-1.5 text-sm text-blue-600 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg">
               <Loader2 size={13} className="animate-spin" />
-              {processingCount} processing…
+              {t("documents.processingCount", { count: processingCount })}
             </span>
           )}
           <label className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium cursor-pointer transition-colors">
             {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-            {uploading ? "Uploading…" : "Upload Document"}
+            {uploading ? t("documents.uploading") : t("documents.upload")}
             <input ref={fileRef} type="file" accept=".pdf,.docx" className="hidden" onChange={handleUpload} disabled={uploading || !departmentId} />
           </label>
         </div>
@@ -181,13 +183,13 @@ export default function DocumentsPage() {
         <table className="w-full">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Document</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Department</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Pages</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Chunks</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Size</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Uploaded</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("documents.document")}</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("documents.status")}</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("documents.department")}</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("documents.pages")}</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("documents.chunks")}</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("documents.size")}</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("documents.uploaded")}</th>
               <th className="px-6 py-3"></th>
             </tr>
           </thead>
@@ -214,7 +216,7 @@ export default function DocumentsPage() {
                   {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : "—"}
                 </td>
                 <td className="px-6 py-4 text-sm text-slate-500">
-                  {new Date(doc.created_at).toLocaleDateString()}
+                  {formatDate(doc.created_at)}
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-1">
@@ -223,7 +225,7 @@ export default function DocumentsPage() {
                         onClick={() => handleReprocess(doc.id)}
                         disabled={reprocessing === doc.id}
                         className="p-1.5 text-slate-400 hover:text-blue-500 rounded-lg hover:bg-blue-50 transition-colors"
-                        title="Retry processing"
+                        title={t("documents.retryProcessing")}
                       >
                         {reprocessing === doc.id
                           ? <Loader2 size={15} className="animate-spin" />
@@ -233,7 +235,7 @@ export default function DocumentsPage() {
                     <button
                       onClick={() => handleDelete(doc.id)}
                       className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
-                      title="Delete document"
+                      title={t("documents.deleteDocument")}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -245,16 +247,13 @@ export default function DocumentsPage() {
         </table>
         {docs.length === 0 && (
           <div className="text-center py-12 text-slate-400">
-            No documents uploaded yet. Upload a PDF or Word document to get started.
+            {t("documents.empty")}
           </div>
         )}
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
-        <strong>How document processing works:</strong> After uploading, the file is automatically parsed,
-        split into overlapping chunks, and indexed for semantic retrieval.
-        When you ask a question in the Assistant, the most relevant chunks are retrieved and sent to the AI engine.
-        Processing time depends on the document size.
+        <strong>{t("documents.howTitle")}</strong> {t("documents.howCopy")}
       </div>
     </div>
   );

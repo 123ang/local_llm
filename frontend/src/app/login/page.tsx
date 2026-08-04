@@ -5,8 +5,11 @@ import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/BrandLogo";
 import { getDefaultDashboardPath } from "@/lib/navigation-policy";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
+import { useI18n } from "@/lib/i18n-context";
 
 export default function LoginPage() {
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -23,14 +26,15 @@ export default function LoginPage() {
       const user = await login(email, password);
       router.push(getDefaultDashboardPath(user.role));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : t("login.failed"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex" style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}>
+    <div className="min-h-screen flex relative" style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)" }}>
+      <div className="absolute top-5 right-5 z-10"><LanguageSwitch dark /></div>
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="max-w-md w-full">
           <BrandLogo variant="login" />
@@ -43,7 +47,7 @@ export default function LoginPage() {
             )}
 
             <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-300 mb-2">Email</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">{t("login.email")}</label>
               <input
                 type="email"
                 value={email}
@@ -55,18 +59,19 @@ export default function LoginPage() {
             </div>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-300 mb-2">Password</label>
+              <label className="block text-sm font-medium text-slate-300 mb-2">{t("login.password")}</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-3 rounded-lg bg-white/10 border border-white/20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="Enter your password"
+                  placeholder={t("login.passwordPlaceholder")}
                   required
                 />
                 <button
                   type="button"
+                  aria-label={t(showPassword ? "login.hidePassword" : "login.showPassword")}
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
                 >
@@ -80,7 +85,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-red-600/30"
             >
-              {loading ? "Signing in..." : "Sign in"}
+              {loading ? t("login.signingIn") : t("login.signIn")}
             </button>
 
           </form>

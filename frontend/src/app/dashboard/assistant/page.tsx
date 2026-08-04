@@ -5,17 +5,19 @@ import { DatabaseResultTable, ExecutiveAnswerCard, SourceBadges } from "./compon
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
 import { useAuth } from "@/lib/auth-context";
+import { useI18n } from "@/lib/i18n-context";
 
 const SOURCE_OPTIONS = [
-  { key: "database", label: "Database", icon: Database, color: "emerald" },
-  { key: "documents", label: "PDF / Docs", icon: FileText, color: "blue" },
-  { key: "faq", label: "FAQ", icon: HelpCircle, color: "amber" },
+  { key: "database", labelKey: "assistant.sourceDatabase", icon: Database, color: "emerald" },
+  { key: "documents", labelKey: "assistant.sourceDocuments", icon: FileText, color: "blue" },
+  { key: "faq", labelKey: "assistant.sourceFaq", icon: HelpCircle, color: "amber" },
 ] as const;
 
 interface Session { id: number; title: string | null; department_ids?: number[]; created_at: string; message_count: number; }
 interface Message { id: number; role: string; content: string; sources: any; sql_generated: string | null; created_at: string; model_tier?: string; response_time_ms?: number; }
 
 export default function AssistantPage() {
+  const { t } = useI18n();
   const companyId = useCompanyId();
   const { user } = useAuth();
   const chatDepartmentIds = user?.department_ids || [];
@@ -86,7 +88,7 @@ export default function AssistantPage() {
     } catch (err: any) {
       setMessages(prev => [
         ...prev,
-        { id: Date.now() + 1, role: "assistant", content: `Error: ${err.message}`, sources: null, sql_generated: null, created_at: new Date().toISOString() }
+        { id: Date.now() + 1, role: "assistant", content: `${t("assistant.errorPrefix")}: ${err.message}`, sources: null, sql_generated: null, created_at: new Date().toISOString() }
       ]);
     }
     setSending(false);
@@ -102,40 +104,40 @@ export default function AssistantPage() {
     } catch {}
   };
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-4">
+    <div className="flex h-[calc(100vh-7.5rem)] flex-col gap-3 md:h-[calc(100vh-8rem)] md:flex-row md:gap-4">
       {/* Sessions sidebar */}
-      <div className="w-72 bg-white rounded-xl border border-slate-200 flex flex-col">
+      <div className="h-36 w-full shrink-0 bg-white rounded-xl border border-slate-200 flex flex-col md:h-auto md:w-72">
         <div className="p-4 border-b border-slate-200">
           <button onClick={newChat} className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors">
-            <Plus size={16} /> New Chat
+            <Plus size={16} /> {t("assistant.newChat")}
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {sessions.map((s) => (
             <div key={s.id} className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${activeSession === s.id ? "bg-red-50 border border-red-200" : "hover:bg-slate-50"}`}>
               <button onClick={() => loadMessages(s.id)} className="flex-1 text-left min-w-0">
-                <p className="text-sm font-medium text-slate-700 truncate">{s.title || "New chat"}</p>
-                <p className="text-xs text-slate-400">{s.message_count} messages</p>
+                <p className="text-sm font-medium text-slate-700 truncate">{s.title || t("assistant.untitledChat")}</p>
+                <p className="text-xs text-slate-400">{t("assistant.messageCount", { count: s.message_count })}</p>
               </button>
-              <button onClick={() => deleteChat(s.id)} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all">
+              <button onClick={() => deleteChat(s.id)} aria-label={t("assistant.deleteChat")} title={t("assistant.deleteChat")} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 transition-all">
                 <Trash2 size={14} />
               </button>
             </div>
           ))}
           {sessions.length === 0 && (
-            <div className="text-center py-8 text-slate-400 text-sm">No conversations yet</div>
+            <div className="text-center py-8 text-slate-400 text-sm">{t("assistant.noConversations")}</div>
           )}
         </div>
       </div>
 
       {/* Chat area */}
-      <div className="flex-1 bg-white rounded-xl border border-slate-200 flex flex-col">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="min-h-0 flex-1 bg-white rounded-xl border border-slate-200 flex flex-col">
+        <div className="flex-1 overflow-y-auto p-3 space-y-4 md:p-6">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Bot size={48} className="mb-4 text-slate-300" />
-              <p className="text-lg font-medium">How can I help you?</p>
-              <p className="text-sm mt-1">Ask about your documents, data, or FAQ. Source Only is the default.</p>
+              <p className="text-lg font-medium">{t("assistant.welcome")}</p>
+              <p className="text-sm mt-1">{t("assistant.welcomeCopy")}</p>
             </div>
           )}
           {messages.map((msg) => (
@@ -161,12 +163,12 @@ export default function AssistantPage() {
                   <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-400">
                     {msg.model_tier === "instant" && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
-                        <Zap size={9} /> Instant
+                        <Zap size={9} /> {t("assistant.instant")}
                       </span>
                     )}
                     {msg.model_tier === "thinking" && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-200">
-                        <Brain size={9} /> Thinking
+                        <Brain size={9} /> {t("assistant.thinking")}
                       </span>
                     )}
                     {msg.response_time_ms && (
@@ -197,8 +199,8 @@ export default function AssistantPage() {
 
         <div className="px-4 pt-3 pb-1 border-t border-slate-200">
           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-            <span className="text-xs font-medium text-slate-500 mr-1">Search in:</span>
-            {SOURCE_OPTIONS.map(({ key, label, icon: Icon, color }) => {
+            <span className="text-xs font-medium text-slate-500 mr-1">{t("assistant.searchIn")}</span>
+            {SOURCE_OPTIONS.map(({ key, labelKey, icon: Icon, color }) => {
               const active = enabledSources.has(key);
               const colorMap: Record<string, { bg: string; border: string; text: string; activeBg: string; activeBorder: string; activeText: string }> = {
                 emerald: { bg: "bg-white", border: "border-slate-200", text: "text-slate-400", activeBg: "bg-emerald-50", activeBorder: "border-emerald-300", activeText: "text-emerald-700" },
@@ -219,7 +221,7 @@ export default function AssistantPage() {
                 >
                   {active && <Check size={12} strokeWidth={3} />}
                   <Icon size={12} />
-                  {label}
+                  {t(labelKey)}
                 </button>
               );
             })}
@@ -241,16 +243,16 @@ export default function AssistantPage() {
             >
               {aiInsights && <Check size={12} strokeWidth={3} />}
               <Lightbulb size={12} />
-              {aiInsights ? (enabledSources.size === 0 ? "AI Only" : "AI Insights") : "Source Only"}
+              {aiInsights ? (enabledSources.size === 0 ? t("assistant.aiOnly") : t("assistant.aiInsights")) : t("assistant.sourceOnly")}
             </button>
           </div>
           {!aiInsights && (
             <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
-              Answer source: approved knowledge base. ANDAI will answer only from selected data, documents, or FAQ. If no evidence is found, it will refuse instead of using general knowledge.
+              {t("assistant.sourceOnlyCopy")}
             </div>
           )}
           <div className="mb-2 flex items-center gap-2 text-[11px] flex-wrap">
-            <span className="text-slate-400">Response mode:</span>
+            <span className="text-slate-400">{t("assistant.responseMode")}</span>
             <button
               type="button"
               onClick={() => setModelMode("auto")}
@@ -260,7 +262,7 @@ export default function AssistantPage() {
                   : "bg-white text-slate-400 border-slate-200"
               }`}
             >
-              Auto
+              {t("assistant.auto")}
             </button>
             <button
               type="button"
@@ -272,7 +274,7 @@ export default function AssistantPage() {
               }`}
             >
               <Zap size={10} />
-              Quick
+              {t("assistant.quick")}
             </button>
             <button
               type="button"
@@ -284,7 +286,7 @@ export default function AssistantPage() {
               }`}
             >
               <Brain size={10} />
-              Deep
+              {t("assistant.deep")}
             </button>
           </div>
           <div className="flex gap-2">
@@ -292,12 +294,14 @@ export default function AssistantPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder="Ask about your data, documents, or policies..."
+              placeholder={t("assistant.placeholder")}
               className="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
               disabled={sending}
             />
             <button
               onClick={handleSend}
+              aria-label={t("assistant.send")}
+              title={t("assistant.send")}
               disabled={sending || !input.trim()}
               className="px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
             >
@@ -306,7 +310,7 @@ export default function AssistantPage() {
           </div>
           {chatDepartmentIds.length === 0 && (
             <p className="mt-2 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-              No department access is assigned. You can still chat, but department knowledge sources may return no matches.
+              {t("assistant.noDepartment")}
             </p>
           )}
         </div>

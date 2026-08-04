@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { LanguageProvider } from "@/lib/i18n-context";
 
 export const metadata: Metadata = {
   title: "Adaptive Neural Decision AI",
@@ -20,7 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        <LanguageProvider><AuthProvider>{children}</AuthProvider></LanguageProvider>
       </body>
     </html>
   );

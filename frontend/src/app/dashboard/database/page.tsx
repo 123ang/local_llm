@@ -3,12 +3,14 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Database, Plus, Upload, Table2, X, Loader2, FileUp, Eye, AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
+import { useI18n } from "@/lib/i18n-context";
 
 type Tab = "tables" | "create" | "upload-table" | "upload-data";
 
 const ROWS_PAGE_SIZE = 50;
 
 export default function DatabasePage() {
+  const { t, formatNumber } = useI18n();
   const companyId = useCompanyId();
   const [tab, setTab] = useState<Tab>("tables");
   const [datasets, setDatasets] = useState<any[]>([]);
@@ -217,10 +219,10 @@ export default function DatabasePage() {
   };
 
   const tabs: { id: Tab; label: string; icon: typeof Table2 }[] = [
-    { id: "tables", label: "Tables", icon: Table2 },
-    { id: "create", label: "Create Table", icon: Plus },
-    { id: "upload-table", label: "Upload Table & Data", icon: Upload },
-    { id: "upload-data", label: "Upload Data", icon: Database },
+    { id: "tables", label: t("database.tables"), icon: Table2 },
+    { id: "create", label: t("database.createTable"), icon: Plus },
+    { id: "upload-table", label: t("database.uploadTableData"), icon: Upload },
+    { id: "upload-data", label: t("database.uploadData"), icon: Database },
   ];
 
   // Styled file input: visible button + hidden input
@@ -267,26 +269,26 @@ export default function DatabasePage() {
   if (!companyId)
     return (
       <div className="text-slate-400 text-center py-12">
-        Select an organization to manage databases
+        {t("database.selectOrganization")}
       </div>
     );
 
   if (departments.length === 0)
     return (
       <div className="text-slate-400 text-center py-12">
-        No department access assigned yet.
+        {t("database.noDepartment")}
       </div>
     );
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Database</h1>
-        <p className="text-slate-500 mt-1">Manage tables and import data</p>
+        <h1 className="text-2xl font-bold text-slate-900">{t("database.title")}</h1>
+        <p className="text-slate-500 mt-1">{t("database.copy")}</p>
       </div>
 
       <div className="flex items-center gap-3">
-        <label className="text-sm font-medium text-slate-700">Department</label>
+        <label className="text-sm font-medium text-slate-700">{t("database.department")}</label>
         <select
           value={departmentId ?? ""}
           onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
@@ -319,20 +321,20 @@ export default function DatabasePage() {
           {datasetsLoading ? (
             <div className="flex flex-col items-center justify-center py-16 text-slate-500">
               <Loader2 size={32} className="animate-spin text-red-500 mb-3" />
-              <p className="text-sm">Loading tables…</p>
+              <p className="text-sm">{t("database.loadingTables")}</p>
             </div>
           ) : (
             <>
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Table</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Columns</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Rows</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Source</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Department</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
-                    <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("database.table")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("database.columns")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("database.rows")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("database.source")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("database.department")}</th>
+                    <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("database.status")}</th>
+                    <th className="text-right px-6 py-3 text-xs font-semibold text-slate-500 uppercase">{t("database.actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -345,7 +347,7 @@ export default function DatabasePage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">{ds.columns_schema?.length || 0}</td>
-                      <td className="px-6 py-4 text-sm text-slate-600">{ds.row_count?.toLocaleString() ?? "—"}</td>
+                      <td className="px-6 py-4 text-sm text-slate-600">{ds.row_count == null ? "—" : formatNumber(ds.row_count)}</td>
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-600">{ds.source}</span>
                       </td>
@@ -358,7 +360,7 @@ export default function DatabasePage() {
                             ds.status === "active" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          {ds.status}
+                          {ds.status === "active" ? t("common.active") : ds.status === "inactive" ? t("common.inactive") : ds.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -366,7 +368,7 @@ export default function DatabasePage() {
                           onClick={() => openViewData(ds)}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-red-100 hover:text-red-700 transition-colors"
                         >
-                          <Eye size={14} /> View data
+                          <Eye size={14} /> {t("database.viewData")}
                         </button>
                       </td>
                     </tr>
@@ -374,7 +376,7 @@ export default function DatabasePage() {
                 </tbody>
               </table>
               {!datasetsLoading && datasets.length === 0 && (
-                <div className="text-center py-12 text-slate-400">No tables yet. Create one or upload a CSV / SQL file.</div>
+                <div className="text-center py-12 text-slate-400">{t("database.empty")}</div>
               )}
             </>
           )}
@@ -386,16 +388,16 @@ export default function DatabasePage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Table Name</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.tableName")}</label>
               <input
                 value={tableName}
                 onChange={(e) => setTableName(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                placeholder="e.g. Sales Data"
+                placeholder={t("database.tableNamePlaceholder")}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.department")}</label>
               <select
                 value={departmentId ?? ""}
                 onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
@@ -407,20 +409,20 @@ export default function DatabasePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.description")}</label>
               <input
                 value={tableDesc}
                 onChange={(e) => setTableDesc(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                placeholder="Optional description"
+                placeholder={t("database.optionalDescription")}
               />
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-slate-700">Columns</label>
+              <label className="text-sm font-medium text-slate-700">{t("database.columns")}</label>
               <button onClick={addColumn} className="text-sm text-red-600 hover:text-red-700 font-medium">
-                + Add Column
+                + {t("database.addColumn")}
               </button>
             </div>
             <div className="space-y-2">
@@ -429,7 +431,7 @@ export default function DatabasePage() {
                   <input
                     value={col.name}
                     onChange={(e) => updateColumn(i, "name", e.target.value)}
-                    placeholder="Column name"
+                    placeholder={t("database.columnName")}
                     className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm"
                   />
                   <select
@@ -437,15 +439,15 @@ export default function DatabasePage() {
                     onChange={(e) => updateColumn(i, "type", e.target.value)}
                     className="px-3 py-2 border border-slate-300 rounded-lg text-sm"
                   >
-                    <option value="text">Text</option>
-                    <option value="integer">Integer</option>
-                    <option value="float">Float</option>
-                    <option value="boolean">Boolean</option>
-                    <option value="date">Date</option>
-                    <option value="timestamp">Timestamp</option>
+                    <option value="text">{t("database.text")}</option>
+                    <option value="integer">{t("database.integer")}</option>
+                    <option value="float">{t("database.float")}</option>
+                    <option value="boolean">{t("database.boolean")}</option>
+                    <option value="date">{t("database.date")}</option>
+                    <option value="timestamp">{t("database.timestamp")}</option>
                   </select>
                   <label className="flex items-center gap-1 text-sm text-slate-600">
-                    <input type="checkbox" checked={col.nullable} onChange={(e) => updateColumn(i, "nullable", e.target.checked)} /> Null
+                    <input type="checkbox" checked={col.nullable} onChange={(e) => updateColumn(i, "nullable", e.target.checked)} /> {t("database.nullable")}
                   </label>
                   {columns.length > 1 && (
                     <button onClick={() => removeColumn(i)} className="text-slate-400 hover:text-red-500">
@@ -464,10 +466,10 @@ export default function DatabasePage() {
             {loading ? (
               <>
                 <Loader2 size={16} className="inline animate-spin mr-2" />
-                Creating…
+                {t("database.creating")}
               </>
             ) : (
-              "Create Table"
+              t("database.createTable")
             )}
           </button>
         </div>
@@ -478,16 +480,16 @@ export default function DatabasePage() {
         <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Display Name</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.displayName")}</label>
               <input
                 value={uploadName}
                 onChange={(e) => setUploadName(e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
-                placeholder="e.g. Q1 Revenue"
+                placeholder={t("database.displayNamePlaceholder")}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Department</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.department")}</label>
               <select
                 value={departmentId ?? ""}
                 onChange={(e) => setDepartmentId(e.target.value ? Number(e.target.value) : null)}
@@ -499,7 +501,7 @@ export default function DatabasePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.description")}</label>
               <input
                 value={uploadDesc}
                 onChange={(e) => setUploadDesc(e.target.value)}
@@ -508,19 +510,19 @@ export default function DatabasePage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">CSV or SQL File</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">{t("database.csvSqlFile")}</label>
             <FileInputButton
               refEl={uploadTableInputRef}
               accept=".csv,.sql"
               onSelect={handlePreview}
-              label="Choose CSV or SQL file"
+              label={t("database.chooseCsvSql")}
               selectedFile={uploadFile}
             />
             {uploadFile && (
               <span className={`inline-block mt-1.5 px-2 py-0.5 text-xs font-medium rounded-full ${
                 isSQL ? "bg-blue-100 text-blue-700" : "bg-emerald-100 text-emerald-700"
               }`}>
-                {isSQL ? "SQL Dump" : "CSV"}
+                {isSQL ? t("database.sqlDump") : "CSV"}
               </span>
             )}
           </div>
@@ -528,7 +530,7 @@ export default function DatabasePage() {
           {previewLoading && (
             <div className="flex items-center gap-2 text-slate-500 py-4">
               <Loader2 size={18} className="animate-spin text-red-500" />
-              <span className="text-sm">Parsing file…</span>
+              <span className="text-sm">{t("database.parsing")}</span>
             </div>
           )}
 
@@ -536,7 +538,7 @@ export default function DatabasePage() {
           {preview && !sqlPreview && (
             <div>
               <p className="text-sm font-medium text-slate-700 mb-2">
-                Preview ({preview.row_count} rows, {preview.columns?.length ?? 0} columns)
+                {t("database.preview", { rows: preview.row_count, columns: preview.columns?.length ?? 0 })}
               </p>
               <div className="overflow-x-auto border border-slate-200 rounded-lg">
                 <table className="w-full text-xs">
@@ -570,38 +572,38 @@ export default function DatabasePage() {
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <p className="text-sm font-medium text-slate-700">
-                  Found {sqlPreview.total_tables} table{sqlPreview.total_tables !== 1 ? "s" : ""} — {sqlPreview.total_rows.toLocaleString()} total rows
+                  {t("database.foundTables", { tables: sqlPreview.total_tables, rows: formatNumber(sqlPreview.total_rows) })}
                 </p>
               </div>
-              {(sqlPreview.tables || []).map((t: any, idx: number) => (
+              {(sqlPreview.tables || []).map((table: any, idx: number) => (
                 <div key={idx} className="border border-slate-200 rounded-lg overflow-hidden">
                   <div className="bg-slate-50 px-4 py-3 flex items-center justify-between">
                     <div>
-                      <span className="text-sm font-semibold text-slate-900">{t.original_name}</span>
-                      <span className="text-xs text-slate-400 ml-2">→ {t.target_name}</span>
-                      <span className="text-xs text-slate-500 ml-3">{t.row_count.toLocaleString()} rows, {t.columns?.length ?? 0} cols</span>
+                      <span className="text-sm font-semibold text-slate-900">{table.original_name}</span>
+                      <span className="text-xs text-slate-400 ml-2">→ {table.target_name}</span>
+                      <span className="text-xs text-slate-500 ml-3">{t("database.rowColumnCount", { rows: formatNumber(table.row_count), columns: table.columns?.length ?? 0 })}</span>
                     </div>
-                    {t.is_duplicate && (
+                    {table.is_duplicate && (
                       <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700">
-                        <AlertTriangle size={12} /> Renamed (original name existed)
+                        <AlertTriangle size={12} /> {t("database.renamed")}
                       </span>
                     )}
                   </div>
                   {/* Column list */}
                   <div className="px-4 py-2 text-xs text-slate-600 flex flex-wrap gap-2 border-b border-slate-100">
-                    {(t.columns || []).map((col: any) => (
+                    {(table.columns || []).map((col: any) => (
                       <span key={col.name} className="bg-slate-100 px-2 py-0.5 rounded">
                         {col.name} <span className="text-slate-400">{col.type}</span>
                       </span>
                     ))}
                   </div>
                   {/* Preview rows */}
-                  {t.preview_rows?.length > 0 && (
+                  {table.preview_rows?.length > 0 && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead className="bg-slate-50">
                           <tr>
-                            {(t.columns || []).map((col: any) => (
+                            {(table.columns || []).map((col: any) => (
                               <th key={col.name} className="px-3 py-1.5 text-left font-semibold text-slate-600 whitespace-nowrap">
                                 {col.name}
                               </th>
@@ -609,9 +611,9 @@ export default function DatabasePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {t.preview_rows.slice(0, 5).map((row: any, ri: number) => (
+                          {table.preview_rows.slice(0, 5).map((row: any, ri: number) => (
                             <tr key={ri}>
-                              {(t.columns || []).map((col: any) => (
+                              {(table.columns || []).map((col: any) => (
                                 <td key={col.name} className="px-3 py-1.5 text-slate-700 max-w-[200px] truncate" title={String(row[col.name] ?? "")}>
                                   {String(row[col.name] ?? "")}
                                 </td>
@@ -630,7 +632,7 @@ export default function DatabasePage() {
           {uploadResult?.errors?.length ? (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 space-y-2">
               <p className="text-sm font-semibold text-amber-800 flex items-center gap-1.5">
-                <AlertTriangle size={16} /> Some tables had import errors
+                <AlertTriangle size={16} /> {t("database.importErrors")}
               </p>
               {uploadResult.errors.map((e, i) => (
                 <div key={i} className="text-xs text-amber-700">
@@ -648,10 +650,10 @@ export default function DatabasePage() {
             {loading ? (
               <>
                 <Loader2 size={16} className="inline animate-spin mr-2" />
-                {isSQL ? "Importing SQL…" : "Creating…"}
+                {isSQL ? t("database.importingSql") : t("database.creating")}
               </>
             ) : (
-              isSQL ? "Import SQL Tables" : "Create Table & Import"
+              isSQL ? t("database.importSqlTables") : t("database.createImport")
             )}
           </button>
         </div>
@@ -661,13 +663,13 @@ export default function DatabasePage() {
       {tab === "upload-data" && (
         <div className="bg-white rounded-xl border border-slate-200 p-6 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Target Table</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.targetTable")}</label>
             <select
               value={targetDataset ?? ""}
               onChange={(e) => setTargetDataset(e.target.value ? Number(e.target.value) : null)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
             >
-              <option value="">Select a table…</option>
+              <option value="">{t("database.selectTable")}</option>
               {datasets.map((ds) => (
                 <option key={ds.id} value={ds.id}>
                   {ds.display_name} ({ds.table_name})
@@ -676,25 +678,25 @@ export default function DatabasePage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">CSV File</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">{t("database.csvFile")}</label>
             <FileInputButton
               refEl={uploadDataInputRef}
               accept=".csv,.sql"
               onSelect={(f) => setDataFile(f)}
-              label="Choose CSV file"
+              label={t("database.chooseCsv")}
               selectedFile={dataFile}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Import Mode</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">{t("database.importMode")}</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2">
                 <input type="radio" name="mode" value="append" checked={importMode === "append"} onChange={() => setImportMode("append")} />
-                <span className="text-sm">Append</span>
+                <span className="text-sm">{t("database.append")}</span>
               </label>
               <label className="flex items-center gap-2">
                 <input type="radio" name="mode" value="replace" checked={importMode === "replace"} onChange={() => setImportMode("replace")} />
-                <span className="text-sm">Replace</span>
+                <span className="text-sm">{t("database.replace")}</span>
               </label>
             </div>
           </div>
@@ -706,10 +708,10 @@ export default function DatabasePage() {
             {loading ? (
               <>
                 <Loader2 size={16} className="inline animate-spin mr-2" />
-                Importing…
+                {t("database.importing")}
               </>
             ) : (
-              "Import Data"
+              t("database.importData")
             )}
           </button>
         </div>
@@ -737,12 +739,12 @@ export default function DatabasePage() {
               {viewDataLoading ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-500">
                   <Loader2 size={32} className="animate-spin text-red-500 mb-3" />
-                  <p className="text-sm">Loading rows…</p>
+                  <p className="text-sm">{t("database.loadingRows")}</p>
                 </div>
               ) : viewData ? (
                 <>
                   <p className="text-sm text-slate-500 mb-3">
-                    Showing {viewData.rows.length} of {viewData.total.toLocaleString()} rows
+                    {t("database.showingRows", { shown: viewData.rows.length, total: formatNumber(viewData.total) })}
                   </p>
                   <div className="overflow-x-auto border border-slate-200 rounded-lg">
                     <table className="w-full text-sm">
@@ -779,23 +781,23 @@ export default function DatabasePage() {
                         disabled={viewPage === 0}
                         className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                       >
-                        Previous
+                        {t("database.previous")}
                       </button>
                       <span className="text-sm text-slate-500">
-                        Page {viewPage + 1} of {Math.ceil(viewData.total / ROWS_PAGE_SIZE)}
+                        {t("database.pageCount", { page: viewPage + 1, total: Math.ceil(viewData.total / ROWS_PAGE_SIZE) })}
                       </span>
                       <button
                         onClick={() => loadViewDataPage(viewPage + 1)}
                         disabled={(viewPage + 1) * ROWS_PAGE_SIZE >= viewData.total}
                         className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                       >
-                        Next
+                        {t("database.next")}
                       </button>
                     </div>
                   )}
                 </>
               ) : (
-                <p className="text-slate-500 py-8">No data or failed to load.</p>
+                <p className="text-slate-500 py-8">{t("database.noData")}</p>
               )}
             </div>
           </div>

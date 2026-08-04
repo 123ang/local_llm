@@ -40,6 +40,7 @@ logs/
 
 # Temp
 setup_db.py
+.playwright-cli/
 
 
 # Local database backups
