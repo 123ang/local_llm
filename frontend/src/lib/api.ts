@@ -87,45 +87,6 @@ export const api = {
   deleteFAQ: (companyId: number, faqId: number) =>
     request<void>(`/faq/${companyId}/${faqId}`, { method: "DELETE" }),
 
-  // Datasets
-  getDatasets: (companyId: number) => request<any[]>(`/datasets/${companyId}`),
-  createManualTable: (companyId: number, data: any) =>
-    request<any>(`/datasets/${companyId}/manual`, { method: "POST", body: JSON.stringify(data) }),
-  uploadTableAndData: (companyId: number, file: File, displayName: string, description: string) => {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("display_name", displayName);
-    form.append("description", description);
-    return request<any>(`/datasets/${companyId}/upload-table`, { method: "POST", body: form });
-  },
-  uploadDataToTable: (companyId: number, datasetId: number, file: File, mode: string) => {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("mode", mode);
-    return request<any>(`/datasets/${companyId}/${datasetId}/upload-data`, { method: "POST", body: form });
-  },
-  previewCSV: (companyId: number, file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    return request<any>(`/datasets/${companyId}/preview-csv`, { method: "POST", body: form });
-  },
-  previewSQL: (companyId: number, file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    return request<any>(`/datasets/${companyId}/preview-sql`, { method: "POST", body: form });
-  },
-  uploadSQL: (companyId: number, file: File, displayName: string, description: string) => {
-    const form = new FormData();
-    form.append("file", file);
-    form.append("display_name", displayName);
-    form.append("description", description);
-    return request<any>(`/datasets/${companyId}/upload-sql`, { method: "POST", body: form });
-  },
-  getDatasetRows: (companyId: number, datasetId: number, limit = 100, offset = 0) =>
-    request<{ columns: string[]; rows: Record<string, unknown>[]; total: number }>(
-      `/datasets/${companyId}/${datasetId}/rows?limit=${limit}&offset=${offset}`
-    ),
-
   // Chat
   getChatSessions: (companyId?: number) => request<any[]>(companyId ? `/chat/sessions?company_id=${companyId}` : "/chat/sessions"),
   getChatMessages: (sessionId: number) => request<any[]>(`/chat/sessions/${sessionId}/messages`),
@@ -162,22 +123,6 @@ export const api = {
   // Audit
   getAuditLogs: (companyId?: number, limit = 100, offset = 0) =>
     request<any[]>(`/audit?${companyId ? `company_id=${companyId}&` : ""}limit=${limit}&offset=${offset}`),
-
-  // Evaluations
-  getEvaluationQuestions: (companyId: number) => request<any[]>(`/evaluations/${companyId}/questions`),
-  createEvaluationQuestion: (companyId: number, data: any) =>
-    request<any>(`/evaluations/${companyId}/questions`, { method: "POST", body: JSON.stringify(data) }),
-  updateEvaluationQuestion: (companyId: number, questionId: number, data: any) =>
-    request<any>(`/evaluations/${companyId}/questions/${questionId}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteEvaluationQuestion: (companyId: number, questionId: number) =>
-    request<void>(`/evaluations/${companyId}/questions/${questionId}`, { method: "DELETE" }),
-  runEvaluationQuestion: (companyId: number, questionId: number) =>
-    request<any>(`/evaluations/${companyId}/questions/${questionId}/run`, { method: "POST" }),
-  getEvaluationRuns: (companyId: number, questionId?: number) =>
-    request<any[]>(`/evaluations/${companyId}/runs${questionId ? `?question_id=${questionId}` : ""}`),
-
-  // Analytics
-  getAnalyticsSummary: (companyId: number) => request<any>(`/analytics/${companyId}/summary`),
 
   // Generic request (for one-off calls)
   request: <T = any>(path: string, options?: RequestInit) => request<T>(path, options),

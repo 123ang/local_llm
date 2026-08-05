@@ -5,7 +5,7 @@ from pathlib import Path
 
 from app.core.probe_detection import is_suspicious_probe_path
 
-logger = logging.getLogger("askai")
+logger = logging.getLogger("techpedia_ai")
 logger.setLevel(logging.INFO)
 
 if not logger.handlers:
@@ -14,7 +14,7 @@ if not logger.handlers:
     logger.addHandler(handler)
 
 
-security_logger = logging.getLogger("askai.security")
+security_logger = logging.getLogger("techpedia_ai.security")
 security_logger.setLevel(logging.INFO)
 
 if not security_logger.handlers:

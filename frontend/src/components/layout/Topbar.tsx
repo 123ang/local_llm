@@ -40,7 +40,7 @@ export default function Topbar() {
               onClick={() => setOpen(!open)}
               className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
             >
-              <span>{selectedCompany?.name || "Select Company"}</span>
+              <span>{selectedCompany?.name || "Select Knowledge Base"}</span>
               <ChevronDown size={14} />
             </button>
             {open && (

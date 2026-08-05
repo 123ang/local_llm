@@ -1,13 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Send, Plus, Trash2, Bot, User, Database, FileText, HelpCircle, Loader2, Check, Lightbulb, Zap, Brain } from "lucide-react";
-import { DatabaseResultTable, ExecutiveAnswerCard, SourceBadges } from "./components/MessageRenderers";
+import { Send, Plus, Trash2, Bot, User, FileText, HelpCircle, Loader2, Check, Zap } from "lucide-react";
+import { ExecutiveAnswerCard, SourceBadges } from "./components/MessageRenderers";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
 
 const SOURCE_OPTIONS = [
-  { key: "database", label: "Database", icon: Database, color: "emerald" },
-  { key: "documents", label: "PDF / Docs", icon: FileText, color: "blue" },
+  { key: "documents", label: "Policy Docs", icon: FileText, color: "blue" },
   { key: "faq", label: "FAQ", icon: HelpCircle, color: "amber" },
 ] as const;
 
@@ -21,16 +20,14 @@ export default function AssistantPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [enabledSources, setEnabledSources] = useState<Set<string>>(new Set(["database", "documents", "faq"]));
-  const [aiInsights, setAiInsights] = useState(false);
-  const [modelMode, setModelMode] = useState<"auto" | "instant" | "thinking">("auto");
+  const [enabledSources, setEnabledSources] = useState<Set<string>>(new Set(["documents", "faq"]));
   const messagesEnd = useRef<HTMLDivElement>(null);
 
   const toggleSource = (key: string) => {
     setEnabledSources(prev => {
       const next = new Set(prev);
       if (next.has(key)) {
-        if (next.size > 1 || aiInsights) next.delete(key);
+        if (next.size > 1) next.delete(key);
       } else {
         next.add(key);
       }
@@ -68,8 +65,8 @@ export default function AssistantPage() {
         activeSession || undefined,
         companyId || undefined,
         Array.from(enabledSources),
-        aiInsights,
-        modelMode
+        false,
+        "instant"
       );
       if (!activeSession) {
         setActiveSession(res.session_id);
@@ -130,18 +127,17 @@ export default function AssistantPage() {
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-slate-400">
               <Bot size={48} className="mb-4 text-slate-300" />
-              <p className="text-lg font-medium">How can I help you?</p>
-              <p className="text-sm mt-1">Ask about your documents, data, or FAQ. Source Only is the default.</p>
+              <p className="text-lg font-medium">Techpedia AI Assistant</p>
+              <p className="text-sm mt-1">Ask about approved policy documents and published FAQ entries.</p>
               <div className="mt-6 w-full max-w-xl">
                 <p className="text-xs font-medium text-slate-500 mb-2">Try asking:</p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {[
-                    "Which lecturers have the highest evaluation percentage?",
-                    "Show me student comments for a course",
-                    "List staff by school or department",
-                    "What do students say about teaching quality?",
-                    "How many students were evaluated per course?",
-                    "What data or tables do we have?",
+                    "What is the eligibility requirement for SME financing?",
+                    "Which policy section covers credit assessment?",
+                    "What documents are required before approval?",
+                    "Summarize the procedure for reviewing an application.",
+                    "Where can I find the exception handling rule?",
                   ].map((q) => (
                     <button
                       key={q}
@@ -170,21 +166,12 @@ export default function AssistantPage() {
                   <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                 )}
 
-                {msg.role === "assistant" && msg.sources?.database && (
-                  <DatabaseResultTable data={msg.sources.database} />
-                )}
-
                 {msg.role === "assistant" && <SourceBadges sources={msg.sources} />}
                 {msg.role === "assistant" && (msg.model_tier || msg.response_time_ms) && (
                   <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-400">
                     {msg.model_tier === "instant" && (
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
                         <Zap size={9} /> Instant
-                      </span>
-                    )}
-                    {msg.model_tier === "thinking" && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-200">
-                        <Brain size={9} /> Thinking
                       </span>
                     )}
                     {msg.response_time_ms && (
@@ -219,7 +206,6 @@ export default function AssistantPage() {
             {SOURCE_OPTIONS.map(({ key, label, icon: Icon, color }) => {
               const active = enabledSources.has(key);
               const colorMap: Record<string, { bg: string; border: string; text: string; activeBg: string; activeBorder: string; activeText: string }> = {
-                emerald: { bg: "bg-white", border: "border-slate-200", text: "text-slate-400", activeBg: "bg-emerald-50", activeBorder: "border-emerald-300", activeText: "text-emerald-700" },
                 blue:    { bg: "bg-white", border: "border-slate-200", text: "text-slate-400", activeBg: "bg-blue-50",    activeBorder: "border-blue-300",    activeText: "text-blue-700" },
                 amber:   { bg: "bg-white", border: "border-slate-200", text: "text-slate-400", activeBg: "bg-amber-50",   activeBorder: "border-amber-300",   activeText: "text-amber-700" },
               };
@@ -241,76 +227,16 @@ export default function AssistantPage() {
                 </button>
               );
             })}
-            <div className="w-px h-5 bg-slate-200 mx-1" />
-            <button
-              type="button"
-              onClick={() => {
-                const next = !aiInsights;
-                setAiInsights(next);
-                if (!next && enabledSources.size === 0) {
-                  setEnabledSources(new Set(["database", "documents", "faq"]));
-                }
-              }}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                aiInsights
-                  ? "bg-purple-50 border-purple-300 text-purple-700"
-                  : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
-              }`}
-            >
-              {aiInsights && <Check size={12} strokeWidth={3} />}
-              <Lightbulb size={12} />
-              {aiInsights ? (enabledSources.size === 0 ? "AI Only" : "AI Insights") : "Source Only"}
-            </button>
           </div>
-          {!aiInsights && (
-            <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
-              Source Only is on: ANDAI will answer only from the selected database, PDFs/docs, or FAQ. If no evidence is found, it will refuse instead of using general knowledge.
-            </div>
-          )}
-          <div className="mb-2 flex items-center gap-2 text-[11px] flex-wrap">
-            <span className="text-slate-400">Model mode:</span>
-            <button
-              type="button"
-              onClick={() => setModelMode("auto")}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
-                modelMode === "auto"
-                  ? "bg-slate-100 text-slate-700 border-slate-300"
-                  : "bg-white text-slate-400 border-slate-200"
-              }`}
-            >
-              Auto
-            </button>
-            <button
-              type="button"
-              onClick={() => setModelMode("instant")}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
-                modelMode === "instant"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                  : "bg-white text-slate-400 border-slate-200"
-              }`}
-            >
-              <Zap size={10} />
-              Instant
-            </button>
-            <button
-              type="button"
-              onClick={() => setModelMode("thinking")}
-              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded border ${
-                modelMode === "thinking"
-                  ? "bg-violet-50 text-violet-700 border-violet-300"
-                  : "bg-white text-slate-400 border-slate-200"
-              }`}
-            >
-              <Brain size={10} />
-              Thinking
-            </button>
+          <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
+            Source-only mode is enforced: Techpedia AI Assistant answers only from selected policy documents or FAQ evidence.
           </div>
           <div className="flex gap-2">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder="Ask about your data, documents, or policies..."
+              placeholder="Ask about SME policy, procedure, or FAQ..."
               className="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-sm"
               disabled={sending}
             />

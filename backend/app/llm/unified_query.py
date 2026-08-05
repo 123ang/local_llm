@@ -7,6 +7,8 @@ from app.core.logger import logger
 from app.models.faq import FAQItem
 from app.models.document import Document, DocumentChunk
 from app.models.dataset import Dataset
+from app.ingestion.section_titles import extract_section_title
+from app.services.source_policy import DEFAULT_SOURCES, source_only_refusal
 
 SQL_TABLE_REF_RE = re.compile(r'\b(?:from|join)\s+((?:"?[a-zA-Z_][\w$]*"?\.)?"?[a-zA-Z_][\w$]*"?)', re.IGNORECASE)
 
@@ -34,22 +36,20 @@ async def unified_query(
     require_citations: bool = True,
 ) -> dict:
     """
-    Search selected knowledge sources (FAQ, documents, structured data)
-    and combine into a single answer using the LLM.
+    Search SME Phase 1 knowledge sources (approved policies/procedures and FAQ)
+    and combine them into a source-bound answer using the LLM.
 
-    ``enabled_sources`` is a list such as ["faq", "documents", "database"].
-    When *None* (default) all three are searched.
-    When ``ai_insights`` is False, strict evidence mode is used: answer only
-    from selected sources, and refuse if no matching source evidence is found.
+    ``enabled_sources`` is clamped to ["documents", "faq"]. General knowledge,
+    database querying, and free-form AI insights are out of scope for Phase 1.
     """
-    all_sources = {"faq", "documents", "database"}
+    ai_insights = False
+    all_sources = set(DEFAULT_SOURCES)
     active = set(enabled_sources) & all_sources if enabled_sources is not None else all_sources
 
-    sources = {"faq": [], "documents": [], "database": None}
+    sources = {"faq": [], "documents": []}
 
     faq_evidence = []
     doc_evidence = []
-    db_evidence = []
 
     # 1. FAQ search
     if company_id and "faq" in active:
@@ -62,78 +62,14 @@ async def unified_query(
     if company_id and "documents" in active:
         doc_results = await _search_documents_semantic(db, company_id, question)
         for chunk in doc_results:
-            doc_evidence.append(f"[Document: {chunk['source']}, page {chunk['page']}]\n{chunk['content']}")
+            section = f", section \"{chunk['section']}\"" if chunk.get("section") else ""
+            page = f", page {chunk['page']}" if chunk.get("page") else ""
+            doc_evidence.append(f"[Document: {chunk['source']}{section}{page}]\n{chunk['content']}")
             sources["documents"].append(chunk)
-
-    # 3. Structured data (Text-to-SQL)
-    if company_id and "database" in active:
-        sql_result = await _query_structured_data(db, company_id, question)
-        if sql_result and sql_result.get("row_count", 0) > 0:
-            if isinstance(sql_result["result"], list) and sql_result["result"]:
-                rows_text = _format_rows_for_llm(sql_result["result"])
-                db_evidence.append(f"[Database query result — {sql_result['row_count']} rows returned]\n{rows_text}")
-            elif isinstance(sql_result["result"], str) and "error" not in sql_result["result"].lower():
-                db_evidence.append(f"[Database] {sql_result['result']}")
-            sources["database"] = sql_result
-
-    # Deterministic formatting for key Kedah Investment demo questions.
-    # Avoids bullet-list answers when the user specifically needs a table.
-    if sources.get("database") and isinstance(sources["database"].get("result"), list):
-        sql_text = (sources["database"].get("sql") or "").lower()
-        rows = sources["database"].get("result") or []
-        if "kedah_sector_jobs_per_rm1b" in sql_text and rows:
-            return {
-                "answer": _format_kedah_sector_jobs_table(rows),
-                "sources": sources,
-                "model_tier": "instant",
-            }
-        if "kedah_overall_jobs_per_rm1b_trend" in sql_text and rows and "union all" not in sql_text:
-            row = rows[0]
-            jobs = row.get("jobs_per_rm1b")
-            total_emp = row.get("total_employment")
-            total_inv = row.get("total_investment_rm_million")
-            answer = (
-                f"Based on the current trend, the estimated employment impact is **{float(jobs):,.2f} jobs per RM1 billion invested**.\n\n"
-                f"| Metric | Value |\n|---|---:|\n"
-                f"| Total employment used | {int(total_emp):,} |\n"
-                f"| Total investment used | RM{float(total_inv):,.2f} million |\n"
-                f"| Jobs per RM1 billion | {float(jobs):,.2f} |\n\n"
-                "Note: calculated from location-level breakdowns to avoid double-counting; 2025 values are normalized from RM to RM million."
-            )
-            return {"answer": answer, "sources": sources, "model_tier": "instant"}
-
-    # Assemble evidence with smart filtering:
-    # If DB returned good results, only include doc chunks with high relevance (>0.55)
-    evidence = list(faq_evidence)
-
-    if db_evidence:
-        evidence.extend(db_evidence)
-        high_quality_docs = []
-        for i, chunk in enumerate(sources["documents"]):
-            if chunk.get("score", 0) >= 0.55:
-                high_quality_docs.append(doc_evidence[i])
-        evidence.extend(high_quality_docs)
-    else:
-        evidence.extend(doc_evidence)
-
-    # Build a short schema summary so the LLM always knows what data exists,
-    # even when no rows matched the specific question.
-    schema_summary = ""
-    if company_id:
-        ds_result = await db.execute(
-            select(Dataset).where(Dataset.company_id == company_id, Dataset.is_queryable == True)
-        )
-        all_datasets = ds_result.scalars().all()
-        if all_datasets:
-            parts = []
-            for ds in all_datasets:
-                col_names = [c.get("name", "") for c in (ds.columns_schema or [])]
-                parts.append(f'- {ds.display_name} ({ds.row_count} rows): columns {", ".join(col_names[:12])}')
-            schema_summary = "Available database tables:\n" + "\n".join(parts)
 
     # 4. Strict evidence mode: do not answer outside selected sources.
     if not ai_insights:
-        strict_evidence = _build_strict_evidence(faq_evidence, db_evidence, doc_evidence, sources, document_min_relevance)
+        strict_evidence = _build_strict_evidence(faq_evidence, doc_evidence, sources, document_min_relevance)
         if not strict_evidence:
             return {
                 "answer": _source_only_refusal(active),
@@ -148,10 +84,11 @@ async def unified_query(
 
 Question: {question}
 
-Answer using only the source evidence above. If the evidence does not contain the answer, say exactly: "I couldn't find that in the selected sources." Include source names/page numbers when available. Prefer Markdown tables for tabular data."""
+Answer using only the source evidence above. If the evidence does not contain the answer, say exactly: "Techpedia AI Assistant could not find that in the selected sources." Include document names, section titles, page numbers, or FAQ labels when available. Prefer Markdown tables for tabular data."""
             system_msg = (
-                "You are ANDAI in Source-Only Mode. Use only the supplied source evidence. "
-                "Do not use outside knowledge, assumptions, or general advice. If the answer is not in the evidence, refuse briefly."
+                "You are Techpedia AI Assistant in SME Phase 1 source-only mode. Use only approved policy/procedure "
+                "and FAQ evidence. Do not use outside knowledge, assumptions, database data, or general advice. "
+                "If the answer is not in the evidence, refuse briefly."
             )
             answer = await generate(prompt, system=system_msg, fast=True)
             return {"answer": answer, "sources": sources, "model_tier": "instant"}
@@ -161,99 +98,12 @@ Answer using only the source evidence above. If the evidence does not contain th
             logger.error(f"Source-only generation error: {llm_err}")
             return {"answer": "[AI error — showing source evidence]\n\n" + "\n\n".join(strict_evidence), "sources": sources, "model_tier": "instant"}
 
-    # 5. Generate answer using LLM — AI Insights may use general knowledge only when no sources match.
-    has_evidence = bool(evidence)
-    if model_mode == "instant":
-        use_fast = True
-    elif model_mode == "thinking":
-        use_fast = False
-    else:
-        # Auto mode: if user enabled any company sources (FAQ/docs/database), prefer instant mode.
-        # Reserve thinking mode mainly for AI-only (no selected sources).
-        use_fast = bool(active)
-
-    try:
-        from app.llm.ollama_client import generate
-
-        if has_evidence:
-            context = "\n\n".join(evidence)
-            prompt = f"""Data:\n{context}
-
-Question: {question}
-
-Answer concisely. If the data is tabular or the user asks for a table/jadual/table format, use a Markdown table instead of bullet points. You may add a short insight."""
-            system_msg = "You are ANDAI, a concise knowledge assistant. Present data clearly. Prefer Markdown tables for tabular data. Be brief. Ground factual claims in the supplied data."
-        else:
-            prompt = f"""{schema_summary}
-
-No matching records found. Question: {question}
-
-Answer from general knowledge. If relevant tables exist above, suggest how to rephrase."""
-            system_msg = (
-                "You are ANDAI, a concise knowledge assistant. "
-                "No data? Use general knowledge. Never show SQL. Be brief."
-            )
-
-        answer = await generate(prompt, system=system_msg, fast=use_fast)
-        model_tier = "instant" if use_fast else "thinking"
-        return {"answer": answer, "sources": sources, "model_tier": model_tier}
-
-    except ConnectionError:
-        if evidence:
-            combined = "\n\n".join(evidence)
-            return {"answer": f"[LLM offline — showing raw results]\n\n{combined}", "sources": sources, "model_tier": "instant"}
-        return {"answer": "The AI service is currently offline. Please try again later.", "sources": sources, "model_tier": "instant"}
-    except Exception as llm_err:
-        logger.error(f"LLM generation error: {llm_err}")
-        if evidence:
-            combined = "\n\n".join(evidence)
-            return {"answer": f"[LLM error — showing raw results]\n\n{combined}", "sources": sources, "model_tier": "instant"}
-        return {"answer": f"An error occurred while generating the answer. Please try again.", "sources": sources, "model_tier": "instant"}
-
-
-def _format_kedah_sector_jobs_table(rows: list[dict], max_rows: int = 30) -> str:
-    overall_rows = [r for r in rows if not r.get("sector") and r.get("jobs_per_rm1b") is not None]
-    sector_rows = [r for r in rows if r.get("sector")]
-    if not sector_rows:
-        return "No sector data found."
-
-    lines = []
-    if overall_rows:
-        overall = overall_rows[0]
-        lines.extend([
-            f"**Overall trend:** {float(overall.get('jobs_per_rm1b') or 0):,.2f} jobs per RM1 billion invested.",
-            "",
-        ])
-
-    lines.extend([
-        "Here is the estimated employment impact per RM1 billion invested by main sector:",
-        "",
-        "| Sector | Total Employment | Total Investment (RM million) | Jobs / RM1 billion |",
-        "|---|---:|---:|---:|",
-    ])
-    for row in sector_rows[:max_rows]:
-        sector = row.get("sector", "")
-        emp = row.get("total_employment") or 0
-        inv = row.get("total_investment_rm_million") or 0
-        jobs = row.get("jobs_per_rm1b") or 0
-        lines.append(f"| {sector} | {int(emp):,} | {float(inv):,.2f} | {float(jobs):,.2f} |")
-
-    top = max(sector_rows, key=lambda r: float(r.get("jobs_per_rm1b") or 0))
-    lines.append("")
-    if len(sector_rows) == 1:
-        lines.append(
-            f"Insight: **{top.get('sector')}** records **{float(top.get('jobs_per_rm1b') or 0):,.2f} jobs per RM1 billion**."
-        )
-    else:
-        lines.append(
-            f"Insight: **{top.get('sector')}** has the highest estimate in this view, at **{float(top.get('jobs_per_rm1b') or 0):,.2f} jobs per RM1 billion**."
-        )
-    return "\n".join(lines)
+    # Defensive fallback. Phase 1 always returns through strict evidence mode above.
+    return {"answer": _source_only_refusal(active), "sources": sources, "model_tier": "instant"}
 
 
 def _build_strict_evidence(
     faq_evidence: list[str],
-    db_evidence: list[str],
     doc_evidence: list[str],
     sources: dict,
     document_min_relevance: float = 0.60,
@@ -261,7 +111,6 @@ def _build_strict_evidence(
     """Return evidence safe enough for Source-Only Mode."""
     evidence: list[str] = []
     evidence.extend(faq_evidence)
-    evidence.extend(db_evidence)
 
     for i, chunk in enumerate(sources.get("documents") or []):
         score = chunk.get("score", 0)
@@ -276,12 +125,7 @@ def _build_strict_evidence(
 
 
 def _source_only_refusal(active_sources: set[str]) -> str:
-    selected = ", ".join(sorted(active_sources)) if active_sources else "selected sources"
-    return (
-        f"I couldn't find that in the selected sources ({selected}).\n\n"
-        "Source-Only Mode is enabled, so I can only answer from the selected documents, database, or FAQ. "
-        "Please ask about the uploaded/company data, or enable AI Insights if you want a general answer."
-    )
+    return source_only_refusal(active_sources)
 
 
 def _extract_sql_table_refs(sql: str) -> set[str]:
@@ -357,7 +201,11 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
             chunk_result = await db.execute(
                 select(DocumentChunk, Document)
                 .join(Document, DocumentChunk.document_id == Document.id)
-                .where(DocumentChunk.id.in_(chunk_ids), Document.status == "ready")
+                .where(
+                    DocumentChunk.id.in_(chunk_ids),
+                    Document.status == "ready",
+                    Document.approval_status == "approved",
+                )
             )
             by_id = {chunk.id: (chunk, doc) for chunk, doc in chunk_result.all()}
             results = []
@@ -372,6 +220,7 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
                     "document_id": doc.id,
                     "company_id": doc.company_id,
                     "page": chunk.page_number,
+                    "section": chunk.section_title or extract_section_title(chunk.content),
                     "score": round(hit["score"], 3),
                 })
             if results:
@@ -381,7 +230,12 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
         result = await db.execute(
             select(DocumentChunk)
             .join(Document, DocumentChunk.document_id == Document.id)
-            .where(DocumentChunk.company_id == company_id, Document.status == "ready", DocumentChunk.embedding.is_not(None))
+            .where(
+                DocumentChunk.company_id == company_id,
+                Document.status == "ready",
+                Document.approval_status == "approved",
+                DocumentChunk.embedding.is_not(None),
+            )
         )
         chunks_with_embeddings = result.scalars().all()
         scored = []
@@ -403,6 +257,7 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
                     "document_id": doc.id if doc else chunk.document_id,
                     "company_id": doc.company_id if doc else chunk.company_id,
                     "page": chunk.page_number,
+                    "section": chunk.section_title or extract_section_title(chunk.content),
                     "score": round(score, 3),
                 })
         if results:
@@ -415,7 +270,11 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
     result = await db.execute(
         select(DocumentChunk)
         .join(Document, DocumentChunk.document_id == Document.id)
-        .where(DocumentChunk.company_id == company_id, Document.status == "ready")
+        .where(
+            DocumentChunk.company_id == company_id,
+            Document.status == "ready",
+            Document.approval_status == "approved",
+        )
     )
     chunks = result.scalars().all()
     if not chunks:
@@ -444,6 +303,7 @@ async def _search_documents_semantic(db: AsyncSession, company_id: int, question
             "document_id": doc.id if doc else chunk.document_id,
             "company_id": doc.company_id if doc else chunk.company_id,
             "page": chunk.page_number,
+            "section": chunk.section_title or extract_section_title(chunk.content),
             "score": score,
         })
     return results

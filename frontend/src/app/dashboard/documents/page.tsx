@@ -97,7 +97,7 @@ export default function DocumentsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Documents</h1>
           <p className="text-slate-500 mt-1">
-            Upload PDFs — they are automatically parsed, chunked, and embedded for semantic search.
+            Upload approved policy and procedure PDFs for source-only retrieval.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -120,7 +120,8 @@ export default function DocumentsPage() {
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Document</th>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Processing</th>
+              <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Approval</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Pages</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Chunks</th>
               <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Size</th>
@@ -142,6 +143,7 @@ export default function DocumentsPage() {
                 <td className="px-6 py-4">
                   <StatusBadge status={doc.status} errorMessage={doc.error_message} />
                 </td>
+                <td className="px-6 py-4 text-sm text-slate-600 capitalize">{doc.approval_status || "approved"}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{doc.page_count || "—"}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">{doc.chunk_count || 0}</td>
                 <td className="px-6 py-4 text-sm text-slate-600">
@@ -185,10 +187,10 @@ export default function DocumentsPage() {
       </div>
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-700">
-        <strong>How PDF processing works:</strong> After uploading, the file is automatically parsed into pages,
-        split into overlapping chunks (~800 chars), and each chunk is embedded using{" "}
+        <strong>How policy processing works:</strong> After uploading, the file is parsed into pages,
+        split into passages with section detection, and each passage is embedded using{" "}
         <code className="bg-blue-100 px-1 rounded">nomic-embed-text</code> via Ollama.
-        When you ask a question in the Assistant, the most semantically similar chunks are retrieved and fed to the LLM.
+        When you ask a question, the assistant retrieves only approved document passages and FAQ evidence.
         Processing time depends on the PDF size — a 10-page document takes ~30 seconds.
       </div>
     </div>

@@ -10,6 +10,9 @@ class DocumentOut(BaseModel):
     file_size: int | None = None
     mime_type: str | None = None
     status: str
+    approval_status: str = "approved"
+    document_type: str = "policy"
+    source_url: str | None = None
     page_count: int | None = None
     chunk_count: int
     error_message: str | None = None

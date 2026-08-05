@@ -25,7 +25,7 @@ class ChatMessage(Base):
     session_id = Column(Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     role = Column(String(20), nullable=False)  # user, assistant
     content = Column(Text, nullable=False)
-    sources = Column(JSON, nullable=True)  # {database: {...}, documents: [...], faq: [...]}
+    sources = Column(JSON, nullable=True)  # {documents: [...], faq: [...]}
     sql_generated = Column(Text, nullable=True)
     tokens_used = Column(Integer, nullable=True)
     response_time_ms = Column(Integer, nullable=True)

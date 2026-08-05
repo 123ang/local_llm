@@ -3,9 +3,9 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
-  title: "Adaptive Neural Decision AI",
+  title: "Techpedia AI Assistant",
   description:
-    "Adaptive Neural Decision AI — private, local-first knowledge assistant for your company data.",
+    "SME Phase 1 source-only policy and FAQ assistant for Techpedia.",
   icons: {
     icon: [{ url: "/icon.png", type: "image/png" }],
     apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],

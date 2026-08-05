@@ -82,6 +82,7 @@ async def query_document_chunks(
                 "JOIN documents d ON d.id = dc.document_id "
                 "WHERE dc.company_id = :company_id "
                 "AND d.status = 'ready' "
+                "AND d.approval_status = 'approved' "
                 "AND dc.embedding_vector IS NOT NULL "
                 "ORDER BY dc.embedding_vector <=> CAST(:embedding AS vector) "
                 "LIMIT :limit"

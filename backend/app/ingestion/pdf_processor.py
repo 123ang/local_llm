@@ -12,6 +12,7 @@ from sqlalchemy import select
 from app.core.database import async_session
 from app.core.logger import logger
 from app.models.document import Document, DocumentChunk
+from app.ingestion.section_titles import extract_section_title
 from app.ingestion.pdf_parser import extract_text_from_pdf, chunk_text
 from app.llm.embeddings.embedding_client import get_embedding
 from app.llm.vector_store import update_document_chunk_vectors
@@ -52,13 +53,19 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
 
         # 2. Chunk text and generate embeddings
         all_chunks: list[dict] = []
+        current_section: str | None = None
         for page_data in pages:
             page_chunks = chunk_text(page_data["text"], chunk_size=800, overlap=150)
             for chunk_text_content in page_chunks:
-                if chunk_text_content.strip():
+                cleaned_chunk = chunk_text_content.strip()
+                if cleaned_chunk:
+                    detected_section = extract_section_title(cleaned_chunk)
+                    if detected_section:
+                        current_section = detected_section
                     all_chunks.append({
-                        "content": chunk_text_content.strip(),
+                        "content": cleaned_chunk,
                         "page": page_data["page"],
+                        "section": current_section,
                     })
 
         if not all_chunks:
@@ -92,6 +99,7 @@ async def _run_pipeline(document_id: int, db: AsyncSession) -> None:
                 chunk_index=idx,
                 content=chunk_data["content"],
                 page_number=chunk_data["page"],
+                section_title=chunk_data["section"],
                 embedding=embedding,
             )
             db.add(chunk_obj)

@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { FileText, MessageSquare, Database, HelpCircle, TrendingUp, RefreshCw } from "lucide-react";
+import { FileText, MessageSquare, HelpCircle, RefreshCw, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { useCompanyId } from "@/hooks/useCompanyId";
@@ -18,7 +18,7 @@ export default function OverviewPage() {
 
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
-  const [counts, setCounts] = useState({ documents: 0, faq: 0, datasets: 0, sessions: 0 });
+  const [counts, setCounts] = useState({ documents: 0, faq: 0, sessions: 0 });
 
   const loadStatus = useCallback(async () => {
     setStatusLoading(true);
@@ -34,16 +34,14 @@ export default function OverviewPage() {
   const loadCounts = useCallback(async () => {
     if (!companyId) return;
     try {
-      const [docs, faqs, datasets, sessions] = await Promise.allSettled([
+      const [docs, faqs, sessions] = await Promise.allSettled([
         api.getDocuments(companyId),
         api.getFAQ(companyId),
-        api.getDatasets(companyId),
         api.getChatSessions(),
       ]);
       setCounts({
         documents: docs.status === "fulfilled" ? docs.value.length : 0,
         faq: faqs.status === "fulfilled" ? faqs.value.length : 0,
-        datasets: datasets.status === "fulfilled" ? datasets.value.length : 0,
         sessions: sessions.status === "fulfilled" ? sessions.value.length : 0,
       });
     } catch {}
@@ -60,8 +58,8 @@ export default function OverviewPage() {
   const stats = [
     { label: "Documents", value: counts.documents, icon: FileText, color: "text-blue-600", bg: "bg-blue-50", href: "/dashboard/documents" },
     { label: "FAQ Items", value: counts.faq, icon: HelpCircle, color: "text-amber-600", bg: "bg-amber-50", href: "/dashboard/faq" },
-    { label: "Datasets", value: counts.datasets, icon: Database, color: "text-emerald-600", bg: "bg-emerald-50", href: "/dashboard/database" },
-    { label: "Chat Sessions", value: counts.sessions, icon: MessageSquare, color: "text-purple-600", bg: "bg-purple-50", href: "/dashboard/assistant" },
+    { label: "Chat Sessions", value: counts.sessions, icon: MessageSquare, color: "text-red-600", bg: "bg-red-50", href: "/dashboard/assistant" },
+    { label: "Source Mode", value: "On", icon: ShieldCheck, color: "text-emerald-600", bg: "bg-emerald-50", href: "/dashboard/assistant" },
   ];
 
   const StatusDot = ({ ok, loading }: { ok: boolean; loading?: boolean }) => {
@@ -73,7 +71,7 @@ export default function OverviewPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Welcome back, {user?.full_name}</h1>
-        <p className="text-slate-500 mt-1">Here&apos;s an overview of your knowledge platform</p>
+        <p className="text-slate-500 mt-1">Source-only policy and FAQ assistant for Techpedia Phase 1</p>
       </div>
 
       {/* Stats */}
@@ -85,7 +83,7 @@ export default function OverviewPage() {
               <div className={`p-2.5 rounded-lg ${stat.bg}`}>
                 <stat.icon size={20} className={stat.color} />
               </div>
-              <TrendingUp size={16} className="text-emerald-500" />
+              <ShieldCheck size={16} className="text-emerald-500" />
             </div>
             <p className="text-2xl font-bold text-slate-900">{companyId ? stat.value : "—"}</p>
             <p className="text-sm text-slate-500 mt-1">{stat.label}</p>
@@ -103,7 +101,7 @@ export default function OverviewPage() {
               <div className="p-2 rounded-lg bg-red-50"><MessageSquare size={18} className="text-red-600" /></div>
               <div>
                 <p className="text-sm font-medium text-slate-900">Ask a Question</p>
-                <p className="text-xs text-slate-500">Chat with your knowledge base</p>
+                <p className="text-xs text-slate-500">Ask approved policy and FAQ questions</p>
               </div>
             </Link>
             <Link href="/dashboard/documents"
@@ -111,15 +109,15 @@ export default function OverviewPage() {
               <div className="p-2 rounded-lg bg-blue-50"><FileText size={18} className="text-blue-600" /></div>
               <div>
                 <p className="text-sm font-medium text-slate-900">Upload Document</p>
-                <p className="text-xs text-slate-500">Add PDFs to your knowledge base</p>
+                <p className="text-xs text-slate-500">Add approved policy or procedure PDFs</p>
               </div>
             </Link>
-            <Link href="/dashboard/database"
+            <Link href="/dashboard/faq"
               className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 border border-slate-100 transition-colors">
-              <div className="p-2 rounded-lg bg-emerald-50"><Database size={18} className="text-emerald-600" /></div>
+              <div className="p-2 rounded-lg bg-amber-50"><HelpCircle size={18} className="text-amber-600" /></div>
               <div>
-                <p className="text-sm font-medium text-slate-900">Import Data</p>
-                <p className="text-xs text-slate-500">Upload CSV or create tables</p>
+                <p className="text-sm font-medium text-slate-900">Maintain FAQ</p>
+                <p className="text-xs text-slate-500">Publish controlled answers for repeated questions</p>
               </div>
             </Link>
           </div>

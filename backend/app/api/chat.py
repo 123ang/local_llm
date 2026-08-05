@@ -10,6 +10,8 @@ from app.schemas.chat import ChatRequest, ChatResponse, ChatSessionOut, ChatMess
 from app.models.chat import ChatSession, ChatMessage
 from app.models.user import User
 from app.services.company_ai_settings_service import get_or_create_company_ai_settings, normalize_allowed_sources
+from app.services.audit_service import log_action
+from app.services.chat_audit import build_chat_audit_details
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -36,25 +38,15 @@ def _compact_message(content: str, max_chars: int = 700) -> str:
 
 
 def _sanitize_sources_for_user(sources: dict | None, current_user: User) -> dict | None:
-    if not sources:
-        return sources
-    sanitized = dict(sources)
-    database = sanitized.get("database")
-    if isinstance(database, dict) and current_user.role not in {"admin", "super_admin"}:
-        database = dict(database)
-        database.pop("sql", None)
-        sanitized["database"] = database
-    return sanitized
+    return sources
 
 
 def _has_attached_evidence(sources: dict | None) -> bool:
     if not sources:
         return False
-    db_source = sources.get("database")
     return bool(
         sources.get("documents")
         or sources.get("faq")
-        or (isinstance(db_source, dict) and db_source.get("row_count", 0) > 0)
     )
 
 
@@ -166,11 +158,7 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
         query_company_id = requested_company_id
         ai_settings = await get_or_create_company_ai_settings(db, query_company_id)
         enabled_sources = normalize_allowed_sources(data.sources, ai_settings.allowed_sources)
-        ai_insights = data.ai_insights
-        if ai_insights is None:
-            ai_insights = not ai_settings.default_source_only
-        if ai_insights and not ai_settings.ai_insights_allowed:
-            ai_insights = False
+        ai_insights = False
         contextual_question = await _build_contextual_question(db, session.id, data.message)
         result = await unified_query(
             question=contextual_question,
@@ -178,7 +166,7 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
             db=db,
             enabled_sources=enabled_sources,
             ai_insights=ai_insights,
-            model_mode=data.model_mode,
+            model_mode="instant",
             document_min_relevance=ai_settings.min_document_relevance,
             require_citations=ai_settings.require_citations,
         )
@@ -188,7 +176,7 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
         model_tier = result.get("model_tier")
         sql_generated = None
     except Exception as e:
-        answer = f"I'm sorry, I encountered an error processing your question. The LLM service may not be available. Error: {str(e)}"
+        answer = "I'm sorry, I encountered an error processing your question. Please try again or contact the Techpedia administrator."
         sources = None
         model_tier = None
         sql_generated = None
@@ -202,6 +190,24 @@ async def ask_question(data: ChatRequest, current_user: User = Depends(get_curre
     )
     db.add(assistant_msg)
     await db.commit()
+    await db.refresh(assistant_msg)
+
+    await log_action(
+        db,
+        action="chat_interaction",
+        user_id=current_user.id,
+        company_id=session.company_id,
+        resource_type="chat",
+        resource_id=assistant_msg.id,
+        details=build_chat_audit_details(
+            session_id=session.id,
+            question=data.message,
+            answer=answer,
+            sources=sources,
+            response_time_ms=elapsed,
+            model_tier=model_tier,
+        ),
+    )
     
     return ChatResponse(session_id=session.id, message=answer, sources=sources, sql_generated=sql_generated, response_time_ms=elapsed, model_tier=model_tier)
 

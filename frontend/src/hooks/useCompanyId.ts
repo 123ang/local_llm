@@ -2,7 +2,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { useAuth } from "@/lib/auth-context";
 
-const STORAGE_KEY = "askai_selected_company_id";
+const STORAGE_KEY = "techpedia_selected_knowledge_base_id";
 
 let listeners: Array<() => void> = [];
 

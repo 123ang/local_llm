@@ -18,6 +18,7 @@ frontend/.next/
 frontend/out/
 
 # Storage
+backend/storage/
 storage/uploads/companies/*/
 storage/chromadb/
 storage/exports/

@@ -6,6 +6,7 @@ from app.schemas.company import CompanyCreate, CompanyUpdate, CompanyOut
 from app.schemas.company_ai_settings import CompanyAISettingsOut, CompanyAISettingsUpdate
 from app.services.company_service import create_company, get_companies, get_company, update_company
 from app.services.company_ai_settings_service import get_or_create_company_ai_settings
+from app.services.source_policy import normalize_allowed_sources
 from app.services.audit_service import log_action
 from app.models.user import User
 
@@ -63,6 +64,12 @@ async def update_company_ai_settings(
 
     settings = await get_or_create_company_ai_settings(db, company_id)
     updates = data.model_dump(exclude_unset=True)
+    if "allowed_sources" in updates:
+        updates["allowed_sources"] = normalize_allowed_sources(None, updates["allowed_sources"])
+    if "default_source_only" in updates:
+        updates["default_source_only"] = True
+    if "ai_insights_allowed" in updates:
+        updates["ai_insights_allowed"] = False
     for key, value in updates.items():
         setattr(settings, key, value)
     await db.commit()

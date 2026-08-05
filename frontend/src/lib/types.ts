@@ -26,6 +26,9 @@ export interface Document {
   original_name: string;
   file_size: number | null;
   status: string;
+  approval_status: string;
+  document_type: string;
+  source_url: string | null;
   page_count: number | null;
   chunk_count: number;
   created_at: string;
@@ -39,21 +42,6 @@ export interface FAQItem {
   category: string | null;
   is_published: boolean;
   sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Dataset {
-  id: number;
-  company_id: number;
-  table_name: string;
-  display_name: string;
-  description: string | null;
-  columns_schema: { name: string; type: string; nullable: boolean }[] | null;
-  row_count: number;
-  source: string;
-  status: string;
-  is_queryable: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -14,6 +14,9 @@ class Document(Base):
     file_size = Column(Integer, nullable=True)
     mime_type = Column(String(100), nullable=True)
     status = Column(String(50), default="pending", nullable=False)  # pending, processing, ready, error
+    approval_status = Column(String(50), default="approved", nullable=False)  # approved, draft, retired
+    document_type = Column(String(100), default="policy", nullable=False)  # policy, procedure, faq_reference
+    source_url = Column(String(1000), nullable=True)
     page_count = Column(Integer, nullable=True)
     chunk_count = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
@@ -34,6 +37,7 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
     page_number = Column(Integer, nullable=True)
+    section_title = Column(String(500), nullable=True)
     embedding = Column(JSON, nullable=True)  # float[] from nomic-embed-text, stored as JSON
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

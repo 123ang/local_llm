@@ -11,19 +11,16 @@ from app.api.companies import router as companies_router
 from app.api.users import router as users_router
 from app.api.faq import router as faq_router
 from app.api.documents import router as documents_router
-from app.api.datasets import router as datasets_router
 from app.api.chat import router as chat_router
 from app.api.audit import router as audit_router
 from app.api.status import router as status_router
-from app.api.evaluations import router as evaluations_router
-from app.api.analytics import router as analytics_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"Starting {settings.PROJECT_NAME} backend...")
     if settings.ENVIRONMENT.lower() == "production":
-        if settings.SECRET_KEY == "askai-dev-secret-change-in-production":
+        if settings.SECRET_KEY == "techpedia-dev-secret-change-in-production":
             raise RuntimeError("Set a strong SECRET_KEY before running in production")
         if settings.SUPER_ADMIN_PASSWORD == "admin123":
             raise RuntimeError("Set a strong SUPER_ADMIN_PASSWORD before running in production")
@@ -92,12 +89,9 @@ app.include_router(companies_router, prefix=settings.API_PREFIX)
 app.include_router(users_router, prefix=settings.API_PREFIX)
 app.include_router(faq_router, prefix=settings.API_PREFIX)
 app.include_router(documents_router, prefix=settings.API_PREFIX)
-app.include_router(datasets_router, prefix=settings.API_PREFIX)
 app.include_router(chat_router, prefix=settings.API_PREFIX)
 app.include_router(audit_router, prefix=settings.API_PREFIX)
 app.include_router(status_router, prefix=settings.API_PREFIX)
-app.include_router(evaluations_router, prefix=settings.API_PREFIX)
-app.include_router(analytics_router, prefix=settings.API_PREFIX)
 
 install_access_log_probe_filter()
 

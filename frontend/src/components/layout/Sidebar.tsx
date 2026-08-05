@@ -3,7 +3,7 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, MessageSquare, FileText, HelpCircle,
-  Database, Building2, Users, ScrollText, LogOut, ClipboardCheck, BarChart3,
+  Users, ScrollText, LogOut,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { BrandLogo } from "@/components/BrandLogo";
@@ -16,20 +16,13 @@ const mainNav = [
 const adminNav = [
   { name: "Documents", href: "/dashboard/documents", icon: FileText },
   { name: "FAQ", href: "/dashboard/faq", icon: HelpCircle },
-  { name: "Database", href: "/dashboard/database", icon: Database },
-  { name: "Evaluations", href: "/dashboard/evaluations", icon: ClipboardCheck },
-  { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-];
-
-const platformNav = [
-  { name: "Companies", href: "/dashboard/companies", icon: Building2 },
   { name: "Users", href: "/dashboard/users", icon: Users },
   { name: "Audit Logs", href: "/dashboard/audit", icon: ScrollText },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, logout, isAdmin, isSuperAdmin } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
 
   const NavItem = ({ item }: { item: (typeof mainNav)[0] }) => {
     const active = pathname === item.href;
@@ -71,14 +64,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {isSuperAdmin && (
-          <div>
-            <p className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Platform</p>
-            <div className="space-y-1">
-              {platformNav.map((item) => <NavItem key={item.href} item={item} />)}
-            </div>
-          </div>
-        )}
       </nav>
 
       <div className="p-3 border-t border-white/10">

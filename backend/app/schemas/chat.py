@@ -8,8 +8,8 @@ class ChatRequest(BaseModel):
     message: str
     session_id: int | None = None
     company_id: int | None = None
-    sources: list[str] | None = None  # subset of ["database", "documents", "faq"]; None = all
-    ai_insights: bool | None = None  # None = company default; False = strict source-only mode
+    sources: list[str] | None = None  # subset of ["documents", "faq"]; None = all Phase 1 sources
+    ai_insights: bool | None = None  # ignored in Phase 1; source-only mode is enforced
     model_mode: Literal["auto", "instant", "thinking"] = "auto"
 
 

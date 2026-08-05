@@ -2,20 +2,33 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.company_ai_settings import CompanyAISettings
-
-DEFAULT_SOURCES = ["database", "documents", "faq"]
+from app.services.source_policy import DEFAULT_SOURCES, normalize_allowed_sources
 
 
 async def get_or_create_company_ai_settings(db: AsyncSession, company_id: int) -> CompanyAISettings:
     result = await db.execute(select(CompanyAISettings).where(CompanyAISettings.company_id == company_id))
     settings = result.scalar_one_or_none()
     if settings:
+        normalized_sources = normalize_allowed_sources(None, settings.allowed_sources)
+        changed = False
+        if settings.allowed_sources != normalized_sources:
+            settings.allowed_sources = normalized_sources
+            changed = True
+        if not settings.default_source_only:
+            settings.default_source_only = True
+            changed = True
+        if settings.ai_insights_allowed:
+            settings.ai_insights_allowed = False
+            changed = True
+        if changed:
+            await db.commit()
+            await db.refresh(settings)
         return settings
 
     settings = CompanyAISettings(
         company_id=company_id,
         default_source_only=True,
-        ai_insights_allowed=True,
+        ai_insights_allowed=False,
         allowed_sources=DEFAULT_SOURCES,
         min_document_relevance=0.60,
         require_citations=True,
@@ -25,10 +38,3 @@ async def get_or_create_company_ai_settings(db: AsyncSession, company_id: int) -
     await db.commit()
     await db.refresh(settings)
     return settings
-
-
-def normalize_allowed_sources(sources: list[str] | None, allowed_sources: list[str] | None) -> list[str]:
-    allowed = set(allowed_sources or DEFAULT_SOURCES)
-    requested = set(sources) if sources is not None else allowed
-    active = sorted(requested & allowed & set(DEFAULT_SOURCES))
-    return active
